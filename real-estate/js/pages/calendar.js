@@ -22,22 +22,39 @@
     /* on drop */
     CalendarApp.prototype.onDrop = function (eventObj, date) { 
         var $this = this;
-            // retrieve the dropped element's stored Event Object
-            var originalEventObject = eventObj.data('eventObject');
-            var $categoryClass = eventObj.attr('data-class');
-            // we need to copy it, so that multiple events don't have a reference to the same object
-            var copiedEventObject = $.extend({}, originalEventObject);
-            // assign it the date that was reported
-            copiedEventObject.start = date;
-            if ($categoryClass)
-                copiedEventObject['className'] = [$categoryClass];
-            // render the event on the calendar
-            $this.$calendar.fullCalendar('renderEvent', copiedEventObject, true);
-            // is the "remove after drop" checkbox checked?
-            if ($('#drop-remove').is(':checked')) {
-                // if so, remove the element from the "Draggable Events" list
-                eventObj.remove();
+        // retrieve the dropped element's stored Event Object
+        var originalEventObject = eventObj.data('eventObject');
+        var $categoryClass = eventObj.attr('data-class');
+        // we need to copy it, so that multiple events don't have a reference to the same object
+        var copiedEventObject = $.extend({}, originalEventObject);
+        // assign it the date that was reported
+        copiedEventObject.start = date;
+        if ($categoryClass)
+            copiedEventObject['className'] = [$categoryClass];
+        
+        // Save to DB via AJAX
+        $.post('ajax_calendar.php', {
+            action: 'add',
+            title: copiedEventObject.title,
+            start: date.format(),
+            end: date.format(),
+            class_name: $categoryClass,
+            all_day: true
+        }, function(response) {
+            if (response.status === 'success') {
+                copiedEventObject.id = response.id; // Assign ID from DB
+                // render the event on the calendar
+                $this.$calendar.fullCalendar('renderEvent', copiedEventObject, true);
+                
+                // is the "remove after drop" checkbox checked?
+                if ($('#drop-remove').is(':checked')) {
+                    // if so, remove the element from the "Draggable Events" list
+                    eventObj.remove();
+                }
+            } else {
+                alert('Failed to save event: ' + response.message);
             }
+        }, 'json');
     },
     /* on click on event */
     CalendarApp.prototype.onEventClick =  function (calEvent, jsEvent, view) {
@@ -49,15 +66,39 @@
                 backdrop: 'static'
             });
             $this.$modal.find('.delete-event').show().end().find('.save-event').hide().end().find('.modal-body').empty().prepend(form).end().find('.delete-event').unbind('click').click(function () {
-                $this.$calendarObj.fullCalendar('removeEvents', function (ev) {
-                    return (ev._id == calEvent._id);
-                });
-                $this.$modal.modal('hide');
+                // Delete from DB
+                $.post('ajax_calendar.php', {
+                    action: 'delete',
+                    id: calEvent.id
+                }, function(response) {
+                    if (response.status === 'success') {
+                        $this.$calendarObj.fullCalendar('removeEvents', function (ev) {
+                            return (ev._id == calEvent._id);
+                        });
+                        $this.$modal.modal('hide');
+                    } else {
+                        alert('Failed to delete: ' + response.message);
+                    }
+                }, 'json');
             });
             $this.$modal.find('form').on('submit', function () {
-                calEvent.title = form.find("input[type=text]").val();
-                $this.$calendarObj.fullCalendar('updateEvent', calEvent);
-                $this.$modal.modal('hide');
+                var newTitle = form.find("input[type=text]").val();
+                
+                // Update in DB
+                $.post('ajax_calendar.php', {
+                    action: 'update',
+                    id: calEvent.id,
+                    title: newTitle
+                }, function(response) {
+                    if (response.status === 'success') {
+                        calEvent.title = newTitle;
+                        $this.$calendarObj.fullCalendar('updateEvent', calEvent);
+                        $this.$modal.modal('hide');
+                    } else {
+                        alert('Failed to update: ' + response.message);
+                    }
+                }, 'json');
+                
                 return false;
             });
     },
@@ -85,18 +126,32 @@
             });
             $this.$modal.find('form').on('submit', function () {
                 var title = form.find("input[name='title']").val();
-                var beginning = form.find("input[name='beginning']").val();
-                var ending = form.find("input[name='ending']").val();
                 var categoryClass = form.find("select[name='category'] option:checked").val();
                 if (title !== null && title.length != 0) {
-                    $this.$calendarObj.fullCalendar('renderEvent', {
+                    
+                    // Add to DB
+                    $.post('ajax_calendar.php', {
+                        action: 'add',
                         title: title,
-                        start:start,
-                        end: end,
-                        allDay: false,
-                        className: categoryClass
-                    }, true);  
-                    $this.$modal.modal('hide');
+                        start: start.format(),
+                        end: end.format(),
+                        class_name: categoryClass,
+                        all_day: allDay
+                    }, function(response) {
+                        if (response.status === 'success') {
+                            $this.$calendarObj.fullCalendar('renderEvent', {
+                                id: response.id,
+                                title: title,
+                                start:start,
+                                end: end,
+                                allDay: allDay,
+                                className: categoryClass
+                            }, true);  
+                            $this.$modal.modal('hide');
+                        } else {
+                            alert('Failed to save event: ' + response.message);
+                        }
+                    }, 'json');
                 }
                 else{
                     alert('You have to give a title to your event');
@@ -128,62 +183,82 @@
     CalendarApp.prototype.init = function() {
         this.enableDrag();
         /*  Initialize the calendar  */
-        var date = new Date();
-        var d = date.getDate();
-        var m = date.getMonth();
-        var y = date.getFullYear();
-        var form = '';
-        var today = new Date($.now());
-
-        var defaultEvents =  [{
-                title: 'Released Ample Admin!',                
-                start: '2017-08-08',
-				end: '2017-08-08',
-                className: 'bg-info'
-            }, {
-                title: 'This is today check date',
-                start: today,
-                end: today,
-                className: 'bg-danger'
-            }, {
-                title: 'This is your birthday',                
-                start: '2017-09-08',
-				end: '2017-09-08',
-                className: 'bg-info'
-            },
-              {
-                title: 'Hanns birthday',                
-                start: '2017-10-08',
-				end: '2017-10-08',
-                className: 'bg-danger'
-            },{
-                title: 'Like it?',
-                start: new Date($.now() + 784800000),
-                className: 'bg-success'
-            }];
-
         var $this = this;
-        $this.$calendarObj = $this.$calendar.fullCalendar({
-            slotDuration: '00:15:00', /* If we want to split day time each 15minutes */
-            minTime: '08:00:00',
-            maxTime: '19:00:00',  
-            defaultView: 'month',  
-            handleWindowResize: true,   
-             
-            header: {
-                left: 'prev,next today',
-                center: 'title',
-                right: 'month,agendaWeek,agendaDay'
-            },
-            events: defaultEvents,
-            editable: true,
-            droppable: true, // this allows things to be dropped onto the calendar !!!
-            eventLimit: true, // allow "more" link when too many events
-            selectable: true,
-            drop: function(date) { $this.onDrop($(this), date); },
-            select: function (start, end, allDay) { $this.onSelect(start, end, allDay); },
-            eventClick: function(calEvent, jsEvent, view) { $this.onEventClick(calEvent, jsEvent, view); }
-
+        
+        // Fetch events from DB
+        $.getJSON('ajax_calendar.php?action=fetch', function(events) {
+            $this.$calendarObj = $this.$calendar.fullCalendar({
+                slotDuration: '00:15:00', /* If we want to split day time each 15minutes */
+                minTime: '08:00:00',
+                maxTime: '19:00:00',  
+                defaultView: 'month',  
+                handleWindowResize: true,   
+                 
+                header: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'month,agendaWeek,agendaDay'
+                },
+                events: events,
+                editable: true,
+                droppable: true, // this allows things to be dropped onto the calendar !!!
+                eventLimit: true, // allow "more" link when too many events
+                selectable: true,
+                drop: function(date) { $this.onDrop($(this), date); },
+                select: function (start, end, allDay) { $this.onSelect(start, end, allDay); },
+                eventClick: function(calEvent, jsEvent, view) { $this.onEventClick(calEvent, jsEvent, view); },
+                eventDrop: function(event, delta, revertFunc) {
+                    $.post('ajax_calendar.php', {
+                        action: 'drop',
+                        id: event.id,
+                        start: event.start.format(),
+                        end: event.end ? event.end.format() : event.start.format()
+                    }, function(response) {
+                        if (response.status !== 'success') {
+                            revertFunc();
+                            alert('Update failed: ' + response.message);
+                        }
+                    }, 'json');
+                },
+                eventResize: function(event, delta, revertFunc) {
+                    $.post('ajax_calendar.php', {
+                        action: 'drop', // Use same action as it handles start/end update
+                        id: event.id,
+                        start: event.start.format(),
+                        end: event.end.format()
+                    }, function(response) {
+                        if (response.status !== 'success') {
+                            revertFunc();
+                            alert('Update failed: ' + response.message);
+                        }
+                    }, 'json');
+                },
+                eventDragStop: function(event, jsEvent) {
+                    var trashEl = $('#calendar-trash');
+                    var ofs = trashEl.offset();
+                    var x1 = ofs.left;
+                    var x2 = ofs.left + trashEl.outerWidth(true);
+                    var y1 = ofs.top;
+                    var y2 = ofs.top + trashEl.outerHeight(true);
+                    
+                    if (jsEvent.pageX >= x1 && jsEvent.pageX <= x2 &&
+                        jsEvent.pageY >= y1 && jsEvent.pageY <= y2) {
+                        
+                        if(confirm('Are you sure you want to delete this event?')) {
+                            $.post('ajax_calendar.php', {
+                                action: 'delete',
+                                id: event.id
+                            }, function(response) {
+                                if (response.status === 'success') {
+                                    $this.$calendarObj.fullCalendar('removeEvents', event._id);
+                                } else {
+                                    alert('Failed to delete: ' + response.message);
+                                }
+                            }, 'json');
+                        }
+                    }
+                }
+            });
         });
 
         //on new event
@@ -191,8 +266,19 @@
             var categoryName = $this.$categoryForm.find("input[name='category-name']").val();
             var categoryColor = $this.$categoryForm.find("select[name='category-color']").val();
             if (categoryName !== null && categoryName.length != 0) {
-                $this.$extEvents.append('<div class="m-15 external-event bg-' + categoryColor + '" data-class="bg-' + categoryColor + '" style="position: relative;"><i class="fa fa-hand-o-right"></i>' + categoryName + '</div>')
-                $this.enableDrag();
+                // Save to DB
+                $.post('ajax_calendar.php', {
+                    action: 'add_template',
+                    title: categoryName,
+                    class_name: 'bg-' + categoryColor
+                }, function(response) {
+                    if (response.status === 'success') {
+                        $this.$extEvents.append('<div class="m-15 external-event bg-' + categoryColor + '" data-class="bg-' + categoryColor + '" style="position: relative;"><i class="fa fa-hand-o-right"></i>' + categoryName + '</div>')
+                        $this.enableDrag();
+                    } else {
+                        alert('Failed to save template: ' + response.message);
+                    }
+                }, 'json');
             }
 
         });
@@ -201,11 +287,10 @@
    //init CalendarApp
     $.CalendarApp = new CalendarApp, $.CalendarApp.Constructor = CalendarApp
     
-}(window.jQuery),// End of use strict
+}(window.jQuery),
 
 //initializing CalendarApp
 function($) {
     "use strict";
     $.CalendarApp.init()
-	
-}(window.jQuery);// End of use strict
+}(window.jQuery);
