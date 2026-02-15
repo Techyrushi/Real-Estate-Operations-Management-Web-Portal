@@ -24,18 +24,18 @@ if ($id) {
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $name = $_POST['name'] ?? '';
-    $gst_no = $_POST['gst_no'] ?? '';
+    $gst_number = $_POST['gst_number'] ?? '';
     $contact_details = $_POST['contact_details'] ?? '';
     $bank_details = $_POST['bank_details'] ?? '';
-    $service_provided = $_POST['service_provided'] ?? '';
+    $material_category = $_POST['material_category'] ?? '';
     $status = $_POST['status'] ?? 'Active';
 
     if (!$error) {
         try {
             if ($id) {
-                $sql = "UPDATE vendors SET name=?, gst_no=?, contact_details=?, bank_details=?, service_provided=?, status=? WHERE id=?";
+                $sql = "UPDATE vendors SET name=?, gst_number=?, contact_details=?, bank_details=?, material_category=?, status=? WHERE id=?";
                 $stmt = $pdo->prepare($sql);
-                if ($stmt->execute([$name, $gst_no, $contact_details, $bank_details, $service_provided, $status, $id])) {
+                if ($stmt->execute([$name, $gst_number, $contact_details, $bank_details, $material_category, $status, $id])) {  
                     $msg = "Vendor updated successfully.";
                     $stmt = $pdo->prepare("SELECT * FROM vendors WHERE id = ?");
                     $stmt->execute([$id]);
@@ -44,9 +44,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $error = "Failed to update vendor.";
                 }
             } else {
-                $sql = "INSERT INTO vendors (name, gst_no, contact_details, bank_details, service_provided, status) VALUES (?, ?, ?, ?, ?, ?)";
+                $sql = "INSERT INTO vendors (name, gst_number, contact_details, bank_details, material_category, status) VALUES (?, ?, ?, ?, ?, ?)";
                 $stmt = $pdo->prepare($sql);
-                if ($stmt->execute([$name, $gst_no, $contact_details, $bank_details, $service_provided, $status])) {
+                if ($stmt->execute([$name, $gst_number, $contact_details, $bank_details, $material_category, $status])) {   
                     $msg = "Vendor created successfully.";
                     $id = $pdo->lastInsertId();
                     $stmt = $pdo->prepare("SELECT * FROM vendors WHERE id = ?");
@@ -126,7 +126,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 <div class="col-md-6">
                                     <div class="form-group">
                                         <label class="form-label">GST Number</label>
-                                        <input type="text" class="form-control" name="gst_no" value="<?php echo htmlspecialchars($vendor['gst_no'] ?? ''); ?>">
+                                        <input type="text" class="form-control" name="gst_number" value="<?php echo htmlspecialchars($vendor['gst_number'] ?? ''); ?>"> 
                                     </div>
                                 </div>
                                 <div class="col-md-6">
@@ -144,7 +144,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 <div class="col-md-6">
                                     <div class="form-group">
                                         <label class="form-label">Material / Service Provided</label>
-                                        <textarea class="form-control" name="service_provided" rows="3" placeholder="e.g. Cement, Steel, Electrical Work"><?php echo htmlspecialchars($vendor['service_provided'] ?? ''); ?></textarea>
+                                        <textarea class="form-control" name="material_category" rows="3" placeholder="e.g. Cement, Steel, Electrical Work"><?php echo htmlspecialchars($vendor['material_category'] ?? ''); ?></textarea>
                                     </div>
                                 </div>
                                 <div class="col-md-6">

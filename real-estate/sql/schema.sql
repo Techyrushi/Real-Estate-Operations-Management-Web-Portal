@@ -67,12 +67,21 @@ CREATE TABLE IF NOT EXISTS payments (
 CREATE TABLE IF NOT EXISTS expenses (
     id INT AUTO_INCREMENT PRIMARY KEY,
     project_id INT,
-    amount DECIMAL(15, 2) NOT NULL,
+    vendor_id INT,
+    material_id INT,
     expense_date DATE NOT NULL,
-    description TEXT,
-    category VARCHAR(100),
+    amount DECIMAL(15,2) NOT NULL,
+    gst_amount DECIMAL(15,2) DEFAULT 0.00,
+    payment_mode VARCHAR(50),
+    bank_id INT,
+    reference_no VARCHAR(100),
+    remarks TEXT,
+    invoice_file VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (project_id) REFERENCES projects(id)
+    FOREIGN KEY (project_id) REFERENCES projects(id),
+    FOREIGN KEY (vendor_id) REFERENCES vendors(id),
+    FOREIGN KEY (material_id) REFERENCES materials(id),
+    FOREIGN KEY (bank_id) REFERENCES banks(id)
 );
 
 CREATE TABLE IF NOT EXISTS partners (
@@ -80,6 +89,34 @@ CREATE TABLE IF NOT EXISTS partners (
     name VARCHAR(100) NOT NULL,
     capital_contribution DECIMAL(15, 2) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS agents (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100),
+    phone VARCHAR(20),
+    email VARCHAR(100),
+    dob DATE,
+    age INT,
+    gender ENUM('Male', 'Female', 'Other') DEFAULT 'Male',
+    description TEXT,
+    facebook VARCHAR(255),
+    twitter VARCHAR(255),
+    instagram VARCHAR(255),
+    photo VARCHAR(255),
+    status ENUM('Active', 'Inactive') DEFAULT 'Active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS user_follows (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    entity_type ENUM('project', 'agent') NOT NULL,
+    entity_id INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_user_entity (user_id, entity_type, entity_id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
 CREATE TABLE IF NOT EXISTS audit_logs (

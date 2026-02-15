@@ -115,7 +115,8 @@ $availableUnits = $unitStats['Available'] ?? 0;
                             </div>
                             <div class="d-flex flex-column fw-500">
                                 <a href="#" class="text-dark hover-primary mb-1 fs-16">Status</a>
-                                <span class="text-fade"><?php echo htmlspecialchars($project['status']); ?></span>
+                                <?php $project_status = $project['status'] ?? 'Planning'; ?>
+                                <span class="text-fade"><?php echo htmlspecialchars($project_status); ?></span>
                             </div>
                         </div>
                     </div>

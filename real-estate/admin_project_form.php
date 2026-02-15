@@ -24,30 +24,39 @@ if ($id) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $name = $_POST['name'] ?? '';
+    $name = trim($_POST['name'] ?? '');
     $type = $_POST['type'] ?? '';
+    $description = $_POST['description'] ?? '';
     $address = $_POST['address'] ?? '';
+    $city = $_POST['city'] ?? '';
+    $state = $_POST['state'] ?? '';
     $location_details = $_POST['location_details'] ?? '';
     $rera_reg = $_POST['rera_reg'] ?? '';
-    $ready_reckoner_rate_res = $_POST['ready_reckoner_rate_res'] ?: 0;
-    $ready_reckoner_rate_com = $_POST['ready_reckoner_rate_com'] ?: 0;
-    $carpet_area = $_POST['carpet_area'] ?: 0;
-    $sellable_area = $_POST['sellable_area'] ?: 0;
-    $num_units = $_POST['num_units'] ?: 0;
+    $ready_reckoner_rate_res = $_POST['ready_reckoner_rate_res'] !== '' ? $_POST['ready_reckoner_rate_res'] : 0;
+    $ready_reckoner_rate_com = $_POST['ready_reckoner_rate_com'] !== '' ? $_POST['ready_reckoner_rate_com'] : 0;
+    $carpet_area = $_POST['carpet_area'] !== '' ? $_POST['carpet_area'] : 0;
+    $sellable_area = $_POST['sellable_area'] !== '' ? $_POST['sellable_area'] : 0;
+    $num_units = $_POST['num_units'] !== '' ? $_POST['num_units'] : 0;
     $status = $_POST['status'] ?? 'Planning';
 
-    // Handle Image Upload
+    if ($name === '' || $type === '') {
+        $error = "Project name and type are required.";
+    }
+
     $image_path = $project['image'] ?? '';
-    if (!empty($_FILES['image']['name'])) {
-        $target_dir = "../images/projects/";
-        if (!file_exists($target_dir)) {
-            mkdir($target_dir, 0777, true);
-        }
-        $target_file = $target_dir . basename($_FILES["image"]["name"]);
-        if (move_uploaded_file($_FILES["image"]["tmp_name"], $target_file)) {
-            $image_path = $target_file;
-        } else {
-            $error = "Sorry, there was an error uploading your file.";
+    if (!$error) {
+        if (!empty($_FILES['image']['name'])) {
+            $target_dir = "../images/projects/";
+            if (!file_exists($target_dir)) {
+                mkdir($target_dir, 0777, true);
+            }
+            $filename = preg_replace('/[^A-Za-z0-9_\.-]/', '_', basename($_FILES["image"]["name"]));
+            $target_file = $target_dir . $filename;
+            if (move_uploaded_file($_FILES["image"]["tmp_name"], $target_file)) {
+                $image_path = $target_file;
+            } else {
+                $error = "Sorry, there was an error uploading your file.";
+            }
         }
     }
 
@@ -55,9 +64,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         try {
             if ($id) {
                 // Update
-                $sql = "UPDATE projects SET name=?, type=?, address=?, location_details=?, rera_reg=?, ready_reckoner_rate_res=?, ready_reckoner_rate_com=?, carpet_area=?, sellable_area=?, num_units=?, status=?, image=? WHERE id=?";
+                $sql = "UPDATE projects SET name=?, type=?, description=?, address=?, city=?, state=?, location_details=?, rera_reg=?, ready_reckoner_rate_res=?, ready_reckoner_rate_com=?, carpet_area=?, sellable_area=?, num_units=?, status=?, image=? WHERE id=?";
                 $stmt = $pdo->prepare($sql);
-                if ($stmt->execute([$name, $type, $address, $location_details, $rera_reg, $ready_reckoner_rate_res, $ready_reckoner_rate_com, $carpet_area, $sellable_area, $num_units, $status, $image_path, $id])) {
+                if ($stmt->execute([$name, $type, $description, $address, $city, $state, $location_details, $rera_reg, $ready_reckoner_rate_res, $ready_reckoner_rate_com, $carpet_area, $sellable_area, $num_units, $status, $image_path, $id])) {
                     $msg = "Project updated successfully.";
                     // Refresh data
                     $stmt = $pdo->prepare("SELECT * FROM projects WHERE id = ?");
@@ -68,9 +77,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 }
             } else {
                 // Insert
-                $sql = "INSERT INTO projects (name, type, address, location_details, rera_reg, ready_reckoner_rate_res, ready_reckoner_rate_com, carpet_area, sellable_area, num_units, status, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                $sql = "INSERT INTO projects (name, type, description, address, city, state, location_details, rera_reg, ready_reckoner_rate_res, ready_reckoner_rate_com, carpet_area, sellable_area, num_units, status, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
                 $stmt = $pdo->prepare($sql);
-                if ($stmt->execute([$name, $type, $address, $location_details, $rera_reg, $ready_reckoner_rate_res, $ready_reckoner_rate_com, $carpet_area, $sellable_area, $num_units, $status, $image_path])) {
+                if ($stmt->execute([$name, $type, $description, $address, $city, $state, $location_details, $rera_reg, $ready_reckoner_rate_res, $ready_reckoner_rate_com, $carpet_area, $sellable_area, $num_units, $status, $image_path])) {
                     $msg = "Project created successfully.";
                     $id = $pdo->lastInsertId();
                     // Fetch new project data
@@ -116,29 +125,37 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     </div>
                     <div class="box-body">
                         <?php if ($msg): ?>
+                            <div class="alert alert-success"><?php echo htmlspecialchars($msg); ?></div>
                             <script>
-                                document.addEventListener('DOMContentLoaded', function() {
-                                    Swal.fire({
-                                        icon: 'success',
-                                        title: 'Success',
-                                        text: '<?php echo $msg; ?>',
-                                        confirmButtonText: 'OK'
-                                    }).then((result) => {
-                                        if (result.isConfirmed) {
+                                document.addEventListener('DOMContentLoaded', function () {
+                                    var msg = <?php echo json_encode($msg); ?>;
+                                    if (typeof Swal !== 'undefined') {
+                                        Swal.fire({
+                                            icon: 'success',
+                                            title: 'Success',
+                                            text: msg,
+                                            confirmButtonText: 'OK'
+                                        }).then(function () {
                                             window.location.href = 'admin_projects.php';
-                                        }
-                                    });
+                                        });
+                                    } else {
+                                        window.location.href = 'admin_projects.php';
+                                    }
                                 });
                             </script>
                         <?php endif; ?>
                         <?php if ($error): ?>
+                            <div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div>
                             <script>
-                                document.addEventListener('DOMContentLoaded', function() {
-                                    Swal.fire({
-                                        icon: 'error',
-                                        title: 'Error',
-                                        text: '<?php echo $error; ?>'
-                                    });
+                                document.addEventListener('DOMContentLoaded', function () {
+                                    var err = <?php echo json_encode($error); ?>;
+                                    if (typeof Swal !== 'undefined') {
+                                        Swal.fire({
+                                            icon: 'error',
+                                            title: 'Error',
+                                            text: err
+                                        });
+                                    }
                                 });
                             </script>
                         <?php endif; ?>
@@ -180,8 +197,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 </div>
                                 <div class="col-md-12">
                                     <div class="form-group">
+                                        <label class="form-label">Project Description</label>
+                                        <textarea class="form-control" name="description" rows="3"><?php echo htmlspecialchars($project['description'] ?? ''); ?></textarea>
+                                    </div>
+                                </div>
+                                <div class="col-md-12">
+                                    <div class="form-group">
                                         <label class="form-label">Site Address</label>
                                         <textarea class="form-control" name="address" rows="3"><?php echo htmlspecialchars($project['address'] ?? ''); ?></textarea>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label class="form-label">City</label>
+                                        <input type="text" class="form-control" name="city" value="<?php echo htmlspecialchars($project['city'] ?? ''); ?>">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label class="form-label">State</label>
+                                        <input type="text" class="form-control" name="state" value="<?php echo htmlspecialchars($project['state'] ?? ''); ?>">
                                     </div>
                                 </div>
                                 <div class="col-md-12">

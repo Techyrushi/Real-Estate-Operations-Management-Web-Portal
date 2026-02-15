@@ -10,8 +10,8 @@
     <meta name="author" content="">
     <link rel="icon" href="https://master-admin-template.multipurposethemes.com/bs5/images/favicon.ico">
 
-    <title>Master Admin - Lockscreen </title>
-  
+    <title>Real Estate - Lockscreen </title>	
+	
 	<!-- Vendors Style-->
 	<link rel="stylesheet" href="css/vendors_css.css">
 

@@ -50,14 +50,14 @@ $projects = $pdo->query("SELECT id, name FROM projects ORDER BY name ASC")->fetc
 $units = [];
 if ($selected_project_id) {
     // Show Available units OR the unit currently assigned to this customer (if editing)
-    $unit_sql = "SELECT id, unit_number, area, price FROM units WHERE project_id = ? AND (status = 'Available'";
+    $unit_sql = "SELECT id, flat_no, area, price FROM units WHERE project_id = ? AND (status = 'Available'";
     $params = [$selected_project_id];
     
     if ($booking && $booking['unit_id']) {
         $unit_sql .= " OR id = ?";
         $params[] = $booking['unit_id'];
     }
-    $unit_sql .= ") ORDER BY unit_number ASC";
+    $unit_sql .= ") ORDER BY flat_no ASC";
     
     $stmt = $pdo->prepare($unit_sql);
     $stmt->execute($params);
@@ -276,7 +276,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                                     data-area="<?php echo $u['area']; ?>" 
                                                     data-price="<?php echo $u['price']; ?>"
                                                     <?php echo ($booking['unit_id'] ?? '') == $u['id'] ? 'selected' : ''; ?>>
-                                                    <?php echo htmlspecialchars($u['unit_number'] . ' (' . $u['area'] . ' sqft)'); ?>
+                                                    <?php echo htmlspecialchars($u['flat_no'] . ' (' . $u['area'] . ' sqft)'); ?>
                                                 </option>
                                             <?php endforeach; ?>
                                         </select>

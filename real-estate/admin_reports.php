@@ -11,32 +11,72 @@ if (!hasRole('Admin') && !hasPermission('view_reports')) {
 // Tab Selection
 $tab = $_GET['tab'] ?? 'financial';
 
+// Global Filters
+$from_date = $_GET['from_date'] ?? '';
+$to_date = $_GET['to_date'] ?? '';
+$project_filter = $_GET['project_id'] ?? '';
+$vendor_filter = $_GET['vendor_id'] ?? '';
+
+$project_options = $pdo->query("SELECT id, name FROM projects ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+$vendor_options = $pdo->query("SELECT id, name FROM vendors ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+
 // 1. Financial Summary Data
 $financials = [];
 if ($tab == 'financial') {
-    $projects = $pdo->query("SELECT id, name FROM projects")->fetchAll();
+    $projects = $project_options;
     foreach ($projects as $p) {
-        // Total Sales (Deal Value) - Linked via Units -> Bookings
-        $sales = $pdo->prepare("SELECT SUM(b.total_price) 
-                               FROM bookings b 
-                               JOIN units u ON b.unit_id = u.id 
-                               WHERE u.project_id = ? AND b.status != 'Cancelled'");
-        $sales->execute([$p['id']]);
+        if ($project_filter !== '' && (int)$project_filter !== (int)$p['id']) {
+            continue;
+        }
+
+        $sales_sql = "SELECT SUM(b.total_price) 
+                       FROM bookings b 
+                       JOIN units u ON b.unit_id = u.id 
+                       WHERE u.project_id = ? AND b.status != 'Cancelled'";
+        $sales_params = [$p['id']];
+        if ($from_date !== '') {
+            $sales_sql .= " AND b.booking_date >= ?";
+            $sales_params[] = $from_date;
+        }
+        if ($to_date !== '') {
+            $sales_sql .= " AND b.booking_date <= ?";
+            $sales_params[] = $to_date;
+        }
+        $sales = $pdo->prepare($sales_sql);
+        $sales->execute($sales_params);
         $total_sales = $sales->fetchColumn() ?: 0;
 
-        // Received from Customers - Linked via Payments -> Bookings -> Units
-        $received = $pdo->prepare("SELECT SUM(pay.amount) 
+        $rec_sql = "SELECT SUM(pay.amount) 
                                   FROM payments pay 
                                   JOIN bookings b ON pay.booking_id = b.id 
                                   JOIN units u ON b.unit_id = u.id 
-                                  WHERE u.project_id = ?");
-        $received->execute([$p['id']]);
+                                  WHERE u.project_id = ?";
+        $rec_params = [$p['id']];
+        if ($from_date !== '') {
+            $rec_sql .= " AND pay.payment_date >= ?";
+            $rec_params[] = $from_date;
+        }
+        if ($to_date !== '') {
+            $rec_sql .= " AND pay.payment_date <= ?";
+            $rec_params[] = $to_date;
+        }
+        $received = $pdo->prepare($rec_sql);
+        $received->execute($rec_params);
         $total_received = $received->fetchColumn() ?: 0;
 
-        // Expenses
-        $expenses = $pdo->prepare("SELECT SUM(amount) FROM expenses WHERE project_id = ?");
-        $expenses->execute([$p['id']]);
-        $total_expenses = $expenses->fetchColumn() ?: 0;
+        $exp_sql = "SELECT SUM(amount) FROM expenses WHERE project_id = ?";
+        $exp_params = [$p['id']];
+        if ($from_date !== '') {
+            $exp_sql .= " AND expense_date >= ?";
+            $exp_params[] = $from_date;
+        }
+        if ($to_date !== '') {
+            $exp_sql .= " AND expense_date <= ?";
+            $exp_params[] = $to_date;
+        }
+        $expenses_stmt = $pdo->prepare($exp_sql);
+        $expenses_stmt->execute($exp_params);
+        $total_expenses = $expenses_stmt->fetchColumn() ?: 0;
 
         $financials[] = [
             'project' => $p['name'],
@@ -76,15 +116,30 @@ if ($tab == 'partners') {
 // 3. Outstanding Data
 $outstanding_data = [];
 if ($tab == 'outstanding') {
-    // Correct query linking Customers -> Bookings -> Units -> Projects
-    $sql = "SELECT c.id as customer_id, c.name, p.name as project_name, b.total_price as deal_value, b.id as booking_id 
+    $sql = "SELECT c.id as customer_id, c.name, p.id as project_id, p.name as project_name, b.total_price as deal_value, b.id as booking_id, b.booking_date 
             FROM customers c 
             JOIN bookings b ON c.id = b.customer_id 
             JOIN units u ON b.unit_id = u.id 
             JOIN projects p ON u.project_id = p.id 
             WHERE b.status != 'Cancelled'";
-    
-    $customers = $pdo->query($sql)->fetchAll();
+
+    $params = [];
+    if ($project_filter !== '') {
+        $sql .= " AND p.id = ?";
+        $params[] = $project_filter;
+    }
+    if ($from_date !== '') {
+        $sql .= " AND b.booking_date >= ?";
+        $params[] = $from_date;
+    }
+    if ($to_date !== '') {
+        $sql .= " AND b.booking_date <= ?";
+        $params[] = $to_date;
+    }
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $customers = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     foreach ($customers as $c) {
         $paid = $pdo->prepare("SELECT SUM(amount) FROM payments WHERE booking_id = ?");
@@ -106,6 +161,137 @@ if ($tab == 'outstanding') {
     }
     // Sort by Balance DESC
     usort($outstanding_data, function($a, $b) { return $b['balance'] <=> $a['balance']; });
+}
+
+// Aging Data
+$aging_data = [];
+if ($tab == 'aging') {
+    $sql = "SELECT c.id as customer_id, c.name, p.id as project_id, p.name as project_name, b.total_price as deal_value, b.id as booking_id, b.booking_date 
+            FROM customers c 
+            JOIN bookings b ON c.id = b.customer_id 
+            JOIN units u ON b.unit_id = u.id 
+            JOIN projects p ON u.project_id = p.id 
+            WHERE b.status != 'Cancelled'";
+
+    $params = [];
+    if ($project_filter !== '') {
+        $sql .= " AND p.id = ?";
+        $params[] = $project_filter;
+    }
+    if ($from_date !== '') {
+        $sql .= " AND b.booking_date >= ?";
+        $params[] = $from_date;
+    }
+    if ($to_date !== '') {
+        $sql .= " AND b.booking_date <= ?";
+        $params[] = $to_date;
+    }
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $customers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $today = date('Y-m-d');
+    foreach ($customers as $c) {
+        $paid = $pdo->prepare("SELECT SUM(amount) FROM payments WHERE booking_id = ?");
+        $paid->execute([$c['booking_id']]);
+        $total_paid = $paid->fetchColumn() ?: 0;
+
+        $balance = $c['deal_value'] - $total_paid;
+        
+        if ($balance > 0) {
+            $days = (strtotime($today) - strtotime($c['booking_date'])) / 86400;
+            $days = (int)max(0, $days);
+            if ($days <= 30) {
+                $bucket = '0-30';
+            } elseif ($days <= 60) {
+                $bucket = '31-60';
+            } elseif ($days <= 90) {
+                $bucket = '61-90';
+            } else {
+                $bucket = '90+';
+            }
+
+            $aging_data[] = [
+                'id' => $c['customer_id'],
+                'name' => $c['name'],
+                'project' => $c['project_name'],
+                'deal_value' => $c['deal_value'],
+                'paid' => $total_paid,
+                'balance' => $balance,
+                'booking_date' => $c['booking_date'],
+                'days' => $days,
+                'bucket' => $bucket
+            ];
+        }
+    }
+}
+
+// Expense Ledger
+$expenses_data = [];
+if ($tab == 'expenses') {
+    $sql = "SELECT e.*, 
+                   p.name as project_name, 
+                   v.name as vendor_name, 
+                   m.category as material_name, 
+                   b.bank_name 
+            FROM expenses e
+            LEFT JOIN projects p ON e.project_id = p.id
+            LEFT JOIN vendors v ON e.vendor_id = v.id
+            LEFT JOIN materials m ON e.material_id = m.id
+            LEFT JOIN banks b ON e.bank_id = b.id
+            WHERE 1=1";
+
+    $params = [];
+    if ($project_filter !== '') {
+        $sql .= " AND e.project_id = ?";
+        $params[] = $project_filter;
+    }
+    if ($vendor_filter !== '') {
+        $sql .= " AND e.vendor_id = ?";
+        $params[] = $vendor_filter;
+    }
+    if ($from_date !== '') {
+        $sql .= " AND e.expense_date >= ?";
+        $params[] = $from_date;
+    }
+    if ($to_date !== '') {
+        $sql .= " AND e.expense_date <= ?";
+        $params[] = $to_date;
+    }
+
+    $sql .= " ORDER BY e.expense_date DESC";
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $expenses_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+// Vendor 90-day Activity
+$vendor_activity = [];
+if ($tab == 'vendor90') {
+    $window_start = date('Y-m-d', strtotime('-90 days'));
+    $sql = "SELECT v.id, v.name,
+                   SUM(IFNULL(e.amount,0) + IFNULL(e.gst_amount,0)) as total_spent,
+                   COUNT(e.id) as bills_count,
+                   MIN(e.expense_date) as first_txn,
+                   MAX(e.expense_date) as last_txn
+            FROM vendors v
+            LEFT JOIN expenses e ON e.vendor_id = v.id AND e.expense_date >= ?";
+    $params = [$window_start];
+    if ($project_filter !== '') {
+        $sql .= " AND e.project_id = ?";
+        $params[] = $project_filter;
+    }
+    if ($vendor_filter !== '') {
+        $sql .= " AND v.id = ?";
+        $params[] = $vendor_filter;
+    }
+    $sql .= " GROUP BY v.id, v.name ORDER BY total_spent DESC";
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $vendor_activity = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 // 4. Cash Flow Data
@@ -139,6 +325,87 @@ if ($tab == 'cashflow') {
             ORDER BY date DESC";
             
     $cashflow_data = $pdo->query($sql)->fetchAll();
+}
+
+if (isset($_GET['export'])) {
+    $export = $_GET['export'];
+    if ($export === 'financial_excel' && !empty($financials)) {
+        header('Content-Type: application/vnd.ms-excel; charset=utf-8');
+        header('Content-Disposition: attachment; filename="project_financials_' . date('Ymd') . '.xls"');
+        echo "<table border='1'>";
+        echo "<tr><th>Project</th><th>Total Deal</th><th>Collections</th><th>Expenses</th><th>Net Cash Flow</th></tr>";
+        foreach ($financials as $row) {
+            echo "<tr>";
+            echo "<td>" . htmlspecialchars($row['project']) . "</td>";
+            echo "<td>" . number_format($row['sales'], 2) . "</td>";
+            echo "<td>" . number_format($row['received'], 2) . "</td>";
+            echo "<td>" . number_format($row['expenses'], 2) . "</td>";
+            echo "<td>" . number_format($row['balance'], 2) . "</td>";
+            echo "</tr>";
+        }
+        echo "</table>";
+        exit;
+    }
+    if ($export === 'aging_excel' && !empty($aging_data)) {
+        header('Content-Type: application/vnd.ms-excel; charset=utf-8');
+        header('Content-Disposition: attachment; filename="receivables_aging_' . date('Ymd') . '.xls"');
+        echo "<table border='1'>";
+        echo "<tr><th>Customer</th><th>Project</th><th>Booking Date</th><th>Total Deal</th><th>Paid</th><th>Balance</th><th>Days</th><th>Bucket</th></tr>";
+        foreach ($aging_data as $row) {
+            echo "<tr>";
+            echo "<td>" . htmlspecialchars($row['name']) . "</td>";
+            echo "<td>" . htmlspecialchars($row['project']) . "</td>";
+            echo "<td>" . htmlspecialchars($row['booking_date']) . "</td>";
+            echo "<td>" . number_format($row['deal_value'], 2) . "</td>";
+            echo "<td>" . number_format($row['paid'], 2) . "</td>";
+            echo "<td>" . number_format($row['balance'], 2) . "</td>";
+            echo "<td>" . (int)$row['days'] . "</td>";
+            echo "<td>" . htmlspecialchars($row['bucket']) . "</td>";
+            echo "</tr>";
+        }
+        echo "</table>";
+        exit;
+    }
+    if ($export === 'expenses_excel' && !empty($expenses_data)) {
+        header('Content-Type: application/vnd.ms-excel; charset=utf-8');
+        header('Content-Disposition: attachment; filename="expense_ledger_' . date('Ymd') . '.xls"');
+        echo "<table border='1'>";
+        echo "<tr><th>Date</th><th>Project</th><th>Vendor</th><th>Material</th><th>Amount</th><th>GST</th><th>Total</th><th>Mode</th><th>Reference</th><th>Remarks</th></tr>";
+        foreach ($expenses_data as $row) {
+            $total = ($row['amount'] ?? 0) + ($row['gst_amount'] ?? 0);
+            echo "<tr>";
+            echo "<td>" . htmlspecialchars($row['expense_date']) . "</td>";
+            echo "<td>" . htmlspecialchars($row['project_name'] ?? '') . "</td>";
+            echo "<td>" . htmlspecialchars($row['vendor_name'] ?? '') . "</td>";
+            echo "<td>" . htmlspecialchars($row['material_name'] ?? '') . "</td>";
+            echo "<td>" . number_format($row['amount'], 2) . "</td>";
+            echo "<td>" . number_format($row['gst_amount'], 2) . "</td>";
+            echo "<td>" . number_format($total, 2) . "</td>";
+            echo "<td>" . htmlspecialchars($row['payment_mode'] ?? '') . "</td>";
+            echo "<td>" . htmlspecialchars($row['reference_no'] ?? '') . "</td>";
+            echo "<td>" . htmlspecialchars($row['remarks'] ?? '') . "</td>";
+            echo "</tr>";
+        }
+        echo "</table>";
+        exit;
+    }
+    if ($export === 'vendor90_excel' && !empty($vendor_activity)) {
+        header('Content-Type: application/vnd.ms-excel; charset=utf-8');
+        header('Content-Disposition: attachment; filename="vendor_90day_activity_' . date('Ymd') . '.xls"');
+        echo "<table border='1'>";
+        echo "<tr><th>Vendor</th><th>Total Spent</th><th>Bills Count</th><th>First Txn</th><th>Last Txn</th></tr>";
+        foreach ($vendor_activity as $row) {
+            echo "<tr>";
+            echo "<td>" . htmlspecialchars($row['name']) . "</td>";
+            echo "<td>" . number_format($row['total_spent'], 2) . "</td>";
+            echo "<td>" . (int)$row['bills_count'] . "</td>";
+            echo "<td>" . htmlspecialchars($row['first_txn']) . "</td>";
+            echo "<td>" . htmlspecialchars($row['last_txn']) . "</td>";
+            echo "</tr>";
+        }
+        echo "</table>";
+        exit;
+    }
 }
 ?>
 

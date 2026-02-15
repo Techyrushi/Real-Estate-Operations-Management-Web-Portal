@@ -123,7 +123,7 @@ try {
         bank_id INT,
         reference_no VARCHAR(100),
         remarks TEXT,
-        attachment VARCHAR(255),
+        invoice_file VARCHAR(255),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
@@ -157,6 +157,27 @@ try {
     )");
     echo "Customers table configured.<br>";
 
+    // --- Agents Table ---
+    $pdo->exec("CREATE TABLE IF NOT EXISTS agents (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        first_name VARCHAR(255) NOT NULL,
+        last_name VARCHAR(255),
+        phone VARCHAR(20),
+        email VARCHAR(255),
+        dob DATE,
+        age INT,
+        gender ENUM('Male','Female','Other') DEFAULT 'Male',
+        description TEXT,
+        facebook VARCHAR(255),
+        twitter VARCHAR(255),
+        instagram VARCHAR(255),
+        photo VARCHAR(255),
+        status ENUM('Active','Inactive') DEFAULT 'Active',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )");
+    echo "Agents table configured.<br>";
+
     // --- Customer Payments Table ---
     $pdo->exec("CREATE TABLE IF NOT EXISTS customer_payments (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -173,6 +194,18 @@ try {
         FOREIGN KEY (bank_id) REFERENCES banks(id) ON DELETE SET NULL
     )");
     echo "Customer Payments table configured.<br>";
+
+    // --- User Follows Table (for follow button on projects/agents) ---
+    $pdo->exec("CREATE TABLE IF NOT EXISTS user_follows (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        entity_type ENUM('project','agent') NOT NULL,
+        entity_id INT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_user_entity (user_id, entity_type, entity_id),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )");
+    echo "User Follows table configured.<br>";
 
     // --- Add Permissions ---
     $permissions = [

@@ -25,16 +25,16 @@ if ($id) {
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $name = $_POST['name'] ?? '';
     $category = $_POST['category'] ?? '';
-    $uom = $_POST['uom'] ?? '';
+    $unit_measure = $_POST['unit_measure'] ?? '';   
     $standard_rate = $_POST['standard_rate'] ?: 0;
     $status = $_POST['status'] ?? 'Active';
 
     if (!$error) {
         try {
             if ($id) {
-                $sql = "UPDATE materials SET name=?, category=?, uom=?, standard_rate=?, status=? WHERE id=?";
+                $sql = "UPDATE materials SET name=?, category=?, unit_measure=?, standard_rate=?, status=? WHERE id=?";
                 $stmt = $pdo->prepare($sql);
-                if ($stmt->execute([$name, $category, $uom, $standard_rate, $status, $id])) {
+                if ($stmt->execute([$name, $category, $unit_measure, $standard_rate, $status, $id])) {  
                     $msg = "Material updated successfully.";
                     $stmt = $pdo->prepare("SELECT * FROM materials WHERE id = ?");
                     $stmt->execute([$id]);
@@ -43,9 +43,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $error = "Failed to update material.";
                 }
             } else {
-                $sql = "INSERT INTO materials (name, category, uom, standard_rate, status) VALUES (?, ?, ?, ?, ?)";
+                $sql = "INSERT INTO materials (name, category, unit_measure, standard_rate, status) VALUES (?, ?, ?, ?, ?)";
                 $stmt = $pdo->prepare($sql);
-                if ($stmt->execute([$name, $category, $uom, $standard_rate, $status])) {
+                if ($stmt->execute([$name, $category, $unit_measure, $standard_rate, $status])) {   
                     $msg = "Material created successfully.";
                     $id = $pdo->lastInsertId();
                     $stmt = $pdo->prepare("SELECT * FROM materials WHERE id = ?");
@@ -137,7 +137,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 <div class="col-md-4">
                                     <div class="form-group">
                                         <label class="form-label">Unit of Measurement (UOM)</label>
-                                        <input type="text" class="form-control" name="uom" value="<?php echo htmlspecialchars($item['uom'] ?? ''); ?>" placeholder="e.g. Kg, Ton, Bag, Sq.ft">
+                                        <input type="text" class="form-control" name="unit_measure" value="<?php echo htmlspecialchars($item['unit_measure'] ?? ''); ?>" placeholder="e.g. Kg, Ton, Bag, Sq.ft">    
                                     </div>
                                 </div>
                                 <div class="col-md-4">

@@ -15,7 +15,7 @@ include_once __DIR__ . '/auth_session.php';
     <meta name="author" content="">
     <link rel="icon" href="https://master-admin-template.multipurposethemes.com/bs5/images/favicon.ico">
 
-    <title>Master Admin - Dashboard</title>
+    <title>Real Estate Admin - Dashboard</title>
 
     <!-- Vendors Style-->
     <link rel="stylesheet" href="css/vendors_css.css">
@@ -59,7 +59,7 @@ include_once __DIR__ . '/auth_session.php';
                                     class="img-fluid svg-icon" alt="">
                             </a>
                         </li>
-                        <li class="btn-group d-lg-inline-flex d-none">
+                        <!-- <li class="btn-group d-lg-inline-flex d-none">
                             <div class="app-menu">
                                 <div class="search-bx mx-5">
                                     <form>
@@ -75,7 +75,7 @@ include_once __DIR__ . '/auth_session.php';
                                     </form>
                                 </div>
                             </div>
-                        </li>
+                        </li> -->
                         <li class="btn-group nav-item d-none d-xl-inline-block">
                             <a href="extra_calendar.php"
                                 class="waves-effect waves-light nav-link btn-outline no-border svg-bt-icon"
@@ -118,8 +118,8 @@ include_once __DIR__ . '/auth_session.php';
                                 <li class="user-body">
                                     <a class="dropdown-item" href="profile_edit.php"><i class="ti-user text-muted me-2"></i>
                                         Profile</a>
-                                    <a class="dropdown-item" href="profile_edit.php"><i class="ti-settings text-muted me-2"></i>
-                                        Settings</a>
+                                    <!-- <a class="dropdown-item" href="profile_edit.php"><i class="ti-settings text-muted me-2"></i>
+                                        Settings</a> -->
                                     <div class="dropdown-divider"></div>
                                     <a class="dropdown-item" href="auth_logout.php"><i class="ti-lock text-muted me-2"></i> Logout</a>
                                 </li>

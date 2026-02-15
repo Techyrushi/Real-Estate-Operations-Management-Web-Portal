@@ -15,66 +15,80 @@ if (!$project_id) {
     exit();
 }
 
-// Fetch Project Info
-$stmt = $pdo->prepare("SELECT * FROM projects WHERE id = ?");
-$stmt->execute([$project_id]);
-$project = $stmt->fetch();
-
-if (!$project) {
-    echo "<div class='content-wrapper'><div class='container-full'><section class='content'><div class='alert alert-danger'>Project Not Found</div></section></div></div>";
-    include 'includes/footer.php';
-    exit();
-}
-
-// Handle Unit Add/Update/Delete
+// Handle messages and data
 $msg = "";
 $error = "";
+$units = [];
+$project = null;
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    if (isset($_POST['delete_unit_id'])) {
-        // Delete Unit
-        $delStmt = $pdo->prepare("DELETE FROM units WHERE id = ?");
-        if ($delStmt->execute([$_POST['delete_unit_id']])) {
-            $msg = "Unit deleted successfully.";
-        } else {
-            $error = "Failed to delete unit.";
-        }
-    } else {
-        // Add/Edit Unit
-        $unit_id = $_POST['unit_id'] ?? '';
-        $flat_no = $_POST['flat_no'] ?? '';
-        $floor = $_POST['floor'] ?? '';
-        $configuration = $_POST['configuration'] ?? '';
-        $area = $_POST['area'] ?? '';
-        $rate = $_POST['rate'] ?? '';
-        $status = $_POST['status'] ?? 'Available';
+try {
+    // Fetch Project Info
+    $stmt = $pdo->prepare("SELECT * FROM projects WHERE id = ?");
+    $stmt->execute([$project_id]);
+    $project = $stmt->fetch();
 
-        if ($unit_id) {
-            // Update
-            $sql = "UPDATE units SET flat_no=?, floor=?, configuration=?, area=?, rate=?, status=? WHERE id=?";
-            $stmt = $pdo->prepare($sql);
-            if ($stmt->execute([$flat_no, $floor, $configuration, $area, $rate, $status, $unit_id])) {
-                $msg = "Unit updated successfully.";
+    if (!$project) {
+        echo "<div class='content-wrapper'><div class='container-full'><section class='content'><div class='alert alert-danger'>Project Not Found</div></section></div></div>";
+        include 'includes/footer.php';
+        exit();
+    }
+
+    // Handle Unit Add/Update/Delete
+    if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+        if (isset($_POST['delete_unit_id'])) {
+            $unitIdToDelete = $_POST['delete_unit_id'];
+
+            // Check if there are any bookings for this unit
+            $checkBookings = $pdo->prepare("SELECT COUNT(*) FROM bookings WHERE unit_id = ?");
+            $checkBookings->execute([$unitIdToDelete]);
+            $bookingCount = (int) $checkBookings->fetchColumn();
+
+            if ($bookingCount > 0) {
+                $error = "Cannot delete unit because bookings exist for this unit. Cancel or delete bookings first.";
             } else {
-                $error = "Failed to update unit.";
+                $delStmt = $pdo->prepare("DELETE FROM units WHERE id = ?");
+                if ($delStmt->execute([$unitIdToDelete])) {
+                    $msg = "Unit deleted successfully.";
+                } else {
+                    $error = "Failed to delete unit.";
+                }
             }
         } else {
-            // Insert
-            $sql = "INSERT INTO units (project_id, flat_no, floor, configuration, area, rate, status) VALUES (?, ?, ?, ?, ?, ?, ?)";
-            $stmt = $pdo->prepare($sql);
-            if ($stmt->execute([$project_id, $flat_no, $floor, $configuration, $area, $rate, $status])) {
-                $msg = "Unit added successfully.";
+            $unit_id = $_POST['unit_id'] ?? '';
+            $flat_no = $_POST['flat_no'] ?? '';
+            $floor = $_POST['floor'] ?? '';
+            $configuration = $_POST['configuration'] ?? '';
+            $area = $_POST['area'] ?? '';
+            $rate = $_POST['rate'] ?? '';
+            $status = $_POST['status'] ?? 'Available';
+
+            if ($unit_id) {
+                $sql = "UPDATE units SET flat_no=?, floor=?, configuration=?, area=?, rate=?, status=? WHERE id=?";
+                $stmt = $pdo->prepare($sql);
+                if ($stmt->execute([$flat_no, $floor, $configuration, $area, $rate, $status, $unit_id])) {
+                    $msg = "Unit updated successfully.";
+                } else {
+                    $error = "Failed to update unit.";
+                }
             } else {
-                $error = "Failed to add unit.";
+                $sql = "INSERT INTO units (project_id, flat_no, floor, configuration, area, rate, status) VALUES (?, ?, ?, ?, ?, ?, ?)";
+                $stmt = $pdo->prepare($sql);
+                if ($stmt->execute([$project_id, $flat_no, $floor, $configuration, $area, $rate, $status])) {
+                    $msg = "Unit added successfully.";
+                } else {
+                    $error = "Failed to add unit.";
+                }
             }
         }
     }
-}
 
-// Fetch Units
-$stmt = $pdo->prepare("SELECT * FROM units WHERE project_id = ? ORDER BY floor ASC, flat_no ASC");
-$stmt->execute([$project_id]);
-$units = $stmt->fetchAll();
+    // Fetch Units
+    $stmt = $pdo->prepare("SELECT * FROM units WHERE project_id = ? ORDER BY floor ASC, flat_no ASC");
+    $stmt->execute([$project_id]);
+    $units = $stmt->fetchAll();
+} catch (PDOException $e) {
+    $error = "Database Error: " . $e->getMessage();
+}
 ?>
 
 <div class="content-wrapper">
@@ -107,23 +121,29 @@ $units = $stmt->fetchAll();
                         <?php if ($msg): ?>
                             <script>
                                 document.addEventListener('DOMContentLoaded', function() {
-                                    Swal.fire({
-                                        icon: 'success',
-                                        title: 'Success',
-                                        text: '<?php echo $msg; ?>',
-                                        confirmButtonText: 'OK'
-                                    });
+                                    var msg = <?php echo json_encode($msg); ?>;
+                                    if (typeof Swal !== 'undefined') {
+                                        Swal.fire({
+                                            icon: 'success',
+                                            title: 'Success',
+                                            text: msg,
+                                            confirmButtonText: 'OK'
+                                        });
+                                    }
                                 });
                             </script>
                         <?php endif; ?>
                         <?php if ($error): ?>
                             <script>
                                 document.addEventListener('DOMContentLoaded', function() {
-                                    Swal.fire({
-                                        icon: 'error',
-                                        title: 'Error',
-                                        text: '<?php echo $error; ?>'
-                                    });
+                                    var err = <?php echo json_encode($error); ?>;
+                                    if (typeof Swal !== 'undefined') {
+                                        Swal.fire({
+                                            icon: 'error',
+                                            title: 'Error',
+                                            text: err
+                                        });
+                                    }
                                 });
                             </script>
                         <?php endif; ?>
@@ -158,7 +178,7 @@ $units = $stmt->fetchAll();
                                             <span class="badge <?php echo $badgeClass; ?>"><?php echo htmlspecialchars($unit['status']); ?></span>
                                         </td>
                                         <td>
-                                            <button class="btn btn-sm btn-info me-1" onclick="editUnit(<?php echo htmlspecialchars(json_encode($unit)); ?>)"><i class="ti-pencil"></i></button>
+                                            <button class="btn btn-sm btn-info me-1" onclick='editUnit(<?php echo json_encode($unit, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>)'><i class="ti-pencil"></i></button>
                                             <form method="post" style="display:inline;" class="delete-form">
                                                 <input type="hidden" name="delete_unit_id" value="<?php echo $unit['id']; ?>">
                                                 <button type="button" class="btn btn-sm btn-danger" onclick="confirmDelete(this.form)"><i class="ti-trash"></i></button>

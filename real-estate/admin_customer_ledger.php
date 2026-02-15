@@ -16,7 +16,7 @@ if (!$customer_id) {
 }
 
 // Fetch Customer Details with Booking Info
-$stmt = $pdo->prepare("SELECT c.*, b.id as booking_id, b.total_price as total_deal_amount, p.name as project_name, u.unit_number 
+$stmt = $pdo->prepare("SELECT c.*, b.id as booking_id, b.total_price as total_deal_amount, p.name as project_name, u.flat_no 
                        FROM customers c 
                        LEFT JOIN bookings b ON c.id = b.customer_id
                        LEFT JOIN units u ON b.unit_id = u.id
@@ -148,7 +148,7 @@ $banks = $pdo->query("SELECT id, bank_name, account_number FROM banks WHERE acco
                 </div>
             </div>
             <div class="ms-auto">
-                <a href="print_customer_statement.php?customer_id=<?php echo $customer_id; ?>" target="_blank" class="btn btn-secondary btn-sm"><i class="ti-printer"></i> Print Statement</a>
+                <a href="print_customer_statement.php?customer_id=<?php echo $customer_id; ?>" class="btn btn-secondary btn-sm"><i class="ti-printer"></i> Print Statement</a>
             </div>
         </div>
     </div>
@@ -166,7 +166,7 @@ $banks = $pdo->query("SELECT id, bank_name, account_number FROM banks WHERE acco
                             </div>
                             <div class="col-md-3">
                                 <h5>Project: <strong><?php echo htmlspecialchars($customer['project_name'] ?? 'N/A'); ?></strong></h5>
-                                <p class="text-muted mb-0">Unit: <strong><?php echo htmlspecialchars($customer['unit_number'] ?? 'N/A'); ?></strong></p>
+                                <p class="text-muted mb-0">Unit: <strong><?php echo htmlspecialchars($customer['flat_no'] ?? 'N/A'); ?></strong></p>
                             </div>
                             <div class="col-md-2">
                                 <h5>Total Deal</h5>
@@ -346,6 +346,7 @@ $banks = $pdo->query("SELECT id, bank_name, account_number FROM banks WHERE acco
                                     <tr class="bg-light">
                                         <th colspan="3" class="text-end">Total Paid</th>
                                         <th class="text-end fw-bold text-success">₹ <?php echo number_format($total_paid, 2); ?></th>
+                                        <th></th>
                                         <th></th>
                                     </tr>
                                 </tfoot>

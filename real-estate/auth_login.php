@@ -64,7 +64,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <meta name="author" content="">
     <link rel="icon" href="https://master-admin-template.multipurposethemes.com/bs5/images/favicon.ico">
 
-    <title>Master Admin - Log in </title>
+    <title>Real Estate - Log in </title>	
   
 	<!-- Vendors Style-->
 	<link rel="stylesheet" href="css/vendors_css.css">

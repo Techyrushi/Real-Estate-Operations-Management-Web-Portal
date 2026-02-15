@@ -4,14 +4,16 @@
         <div class="user-profile px-30 py-15">
             <div class="text-center">
                 <div class="image">
-                    <img src="<?php echo !empty($_SESSION['profile_image']) ? $_SESSION['profile_image'] : '../images/avatar/1.jpg'; ?>" class="avatar avatar-xxxl box-shadowed" alt="User Image">
+                    <img src="<?php echo !empty($_SESSION['profile_image']) ? $_SESSION['profile_image'] : '../images/avatar/1.jpg'; ?>"
+                        class="avatar avatar-xxxl box-shadowed" alt="User Image">
                 </div>
                 <div class="info mt-20">
-					<a class="dropdown-toggle px-20" data-bs-toggle="dropdown" href="#"><?php echo $_SESSION['username'] ?? 'User'; ?></a>
-					<div class="dropdown-menu">
+                    <a class="dropdown-toggle px-20" data-bs-toggle="dropdown"
+                        href="#"><?php echo $_SESSION['username'] ?? 'User'; ?></a>
+                    <div class="dropdown-menu">
                         <a class="dropdown-item" href="profile_edit.php"><i class="ti-user"></i> Profile</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="profile_edit.php"><i class="ti-settings"></i> Settings</a>
+                        <!-- <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="profile_edit.php"><i class="ti-settings"></i> Settings</a> -->
                     </div>
                 </div>
             </div>
@@ -31,118 +33,56 @@
                             <span>Dashboard</span>
                         </a>
                     </li>
-                    <?php if (hasRole('Admin') || hasPermission('manage_users') || hasPermission('manage_roles')): ?>
-                    <li class="header">ADMINISTRATION</li>
-                    <li class="treeview">
-                        <a href="#">
-                            <i data-feather="lock"></i>
-                            <span>Access Control</span>
-                            <span class="pull-right-container">
-                                <i class="fa fa-angle-right pull-right"></i>
-                            </span>
-                        </a>
-                        <ul class="treeview-menu">
-                            <?php if (hasRole('Admin') || hasPermission('manage_users')): ?>
-                            <li><a href="admin_users.php"><i class="icon-Commit"><span class="path1"></span><span class="path2"></span></i>Users</a></li>
-                            <?php endif; ?>
-                            <?php if (hasRole('Admin') || hasPermission('manage_roles')): ?>
-                            <li><a href="admin_roles.php"><i class="icon-Commit"><span class="path1"></span><span class="path2"></span></i>Roles</a></li>
-                            <?php endif; ?>
-                        </ul>
-                    </li>
-                    <?php endif; ?>
+
                     <?php if (hasRole('Admin') || hasPermission('manage_projects') || hasPermission('manage_partners')): ?>
-                    <li class="header">MASTERS</li>
-                    <li class="treeview">
-                        <a href="#">
-                            <i data-feather="database"></i>
-                            <span>Masters Modules</span>
-                            <span class="pull-right-container">
-                                <i class="fa fa-angle-right pull-right"></i>
-                            </span>
-                        </a>
-                        <ul class="treeview-menu">
-                            <?php if (hasRole('Admin') || hasPermission('manage_projects')): ?>
-                            <li><a href="admin_projects.php"><i class="icon-Commit"><span class="path1"></span><span class="path2"></span></i>Projects</a></li>
-                            <li><a href="admin_banks.php"><i class="icon-Commit"><span class="path1"></span><span class="path2"></span></i>Banks</a></li>
-                            <?php endif; ?>
-                            <?php if (hasRole('Admin') || hasPermission('manage_partners')): ?>
-                            <li><a href="admin_partners.php"><i class="icon-Commit"><span class="path1"></span><span class="path2"></span></i>Partners</a></li>
-                            <?php endif; ?>
-                            <?php if (hasRole('Admin') || hasPermission('manage_vendors')): ?>
-                            <li><a href="admin_materials.php"><i class="icon-Commit"><span class="path1"></span><span class="path2"></span></i>Materials</a></li>
-                            <li><a href="admin_vendors.php"><i class="icon-Commit"><span class="path1"></span><span class="path2"></span></i>Vendors</a></li>
-                            <?php endif; ?>
-                        </ul>
-                    </li>
+                        <li class="header">MASTERS</li>
+                        <li class="treeview">
+                            <a href="#">
+                                <i data-feather="database"></i>
+                                <span>Masters Modules</span>
+                                <span class="pull-right-container">
+                                    <i class="fa fa-angle-right pull-right"></i>
+                                </span>
+                            </a>
+                            <ul class="treeview-menu">
+                                <?php if (hasRole('Admin') || hasPermission('manage_projects')): ?>
+                                    <li><a href="admin_projects.php"><i class="icon-Commit"><span class="path1"></span><span
+                                                    class="path2"></span></i>Projects</a></li>
+                                    <li><a href="admin_banks.php"><i class="icon-Commit"><span class="path1"></span><span
+                                                    class="path2"></span></i>Banks</a></li>
+                                <?php endif; ?>
+                                <?php if (hasRole('Admin') || hasPermission('manage_partners')): ?>
+                                    <li><a href="admin_partners.php"><i class="icon-Commit"><span class="path1"></span><span
+                                                    class="path2"></span></i>Partners</a></li>
+                                <?php endif; ?>
+                                <?php if (hasRole('Admin') || hasPermission('manage_vendors')): ?>
+                                    <li><a href="admin_materials.php"><i class="icon-Commit"><span class="path1"></span><span
+                                                    class="path2"></span></i>Materials</a></li>
+                                    <li><a href="admin_vendors.php"><i class="icon-Commit"><span class="path1"></span><span
+                                                    class="path2"></span></i>Vendors</a></li>
+                                <?php endif; ?>
+                            </ul>
+                        </li>
                     <?php endif; ?>
-                    
+
                     <li class="header">OPERATIONS</li>
                     <?php if (hasRole('Admin') || hasPermission('manage_customers')): ?>
-                    <li>
-                        <a href="admin_customers.php">
-                            <i data-feather="users"></i>
-                            <span>Customers</span>
-                        </a>
-                    </li>
+                        <li>
+                            <a href="admin_customers.php">
+                                <i data-feather="users"></i>
+                                <span>Customers</span>
+                            </a>
+                        </li>
                     <?php endif; ?>
                     <?php if (hasRole('Admin') || hasPermission('manage_expenses')): ?>
-                    <li>
-                        <a href="admin_expenses.php">
-                            <i data-feather="dollar-sign"></i>
-                            <span>Expenses</span>
-                        </a>
-                    </li>
+                        <li>
+                            <a href="admin_expenses.php">
+                                <i data-feather="dollar-sign"></i>
+                                <span>Expenses</span>
+                            </a>
+                        </li>
                     <?php endif; ?>
 
-                    <li class="header">ANALYTICS</li>
-                    <?php if (hasRole('Admin') || hasPermission('view_reports')): ?>
-                    <li>
-                        <a href="admin_reports.php">
-                            <i data-feather="pie-chart"></i>
-                            <span>Reports</span>
-                        </a>
-                    </li>
-                    <?php endif; ?>
-
-                    <!-- Property List link removed as per request -->
-                    <li>
-                        <a href="propertygrid.php">
-                            <i data-feather="grid"></i>
-                            <span>Property Grid</span>
-                        </a>
-                    </li>
-                    <li>
-                        <a href="addproperty.php">
-                            <i data-feather="award"></i>
-                            <span>Add Property</span>
-                        </a>
-                    </li>
-                    <li>
-                        <a href="propertydetails.php">
-                            <i data-feather="file-text"></i>
-                            <span>Property Detail</span>
-                        </a>
-                    </li>
-                    <li class="treeview">
-                        <a href="#">
-                            <i data-feather="home"></i>
-                            <span>Property Types</span>
-                            <span class="pull-right-container">
-                                <i class="fa fa-angle-right pull-right"></i>
-                            </span>
-                        </a>
-                        <ul class="treeview-menu">
-                            <li><a href="apartment.php"><i class="icon-Commit"><span class="path1"></span><span
-                                            class="path2"></span></i>Apartment</a></li>
-                            <li><a href="office.php"><i class="icon-Commit"><span class="path1"></span><span
-                                            class="path2"></span></i>Office</a></li>
-                            <li><a href="shop.php"><i class="icon-Commit"><span class="path1"></span><span
-                                            class="path2"></span></i>Shop</a></li>
-                            <li><a href="villa.php"><i class="icon-Commit"><span class="path1"></span><span
-                                            class="path2"></span></i>Villa</a></li>
-                        </ul>
-                    </li>
                     <li class="treeview">
                         <a href="#">
                             <i data-feather="users"></i>
@@ -156,10 +96,45 @@
                                             class="path2"></span></i>All Agents</a></li>
                             <li><a href="addagent.php"><i class="icon-Commit"><span class="path1"></span><span
                                             class="path2"></span></i>Add Agent</a></li>
-                            <li><a href="agentprofile.php"><i class="icon-Commit"><span class="path1"></span><span
-                                            class="path2"></span></i>Agent Profile</a></li>
+                            <!-- <li><a href="agentprofile.php"><i class="icon-Commit"><span class="path1"></span><span
+                                            class="path2"></span></i>Agent Profile</a></li> -->
                         </ul>
                     </li>
+
+                    <li class="header">ANALYTICS</li>
+                    <?php if (hasRole('Admin') || hasPermission('view_reports')): ?>
+                        <li>
+                            <a href="admin_reports.php">
+                                <i data-feather="pie-chart"></i>
+                                <span>Reports</span>
+                            </a>
+                        </li>
+                    <?php endif; ?>
+
+                    <?php if (hasRole('Admin') || hasPermission('manage_users') || hasPermission('manage_roles')): ?>
+                        <li class="header">ADMINISTRATION</li>
+                        <li class="treeview">
+                            <a href="#">
+                                <i data-feather="lock"></i>
+                                <span>Access Control</span>
+                                <span class="pull-right-container">
+                                    <i class="fa fa-angle-right pull-right"></i>
+                                </span>
+                            </a>
+                            <ul class="treeview-menu">
+                                <?php if (hasRole('Admin') || hasPermission('manage_users')): ?>
+                                    <li><a href="admin_users.php"><i class="icon-Commit"><span class="path1"></span><span
+                                                    class="path2"></span></i>Users</a></li>
+                                <?php endif; ?>
+                                <?php if (hasRole('Admin') || hasPermission('manage_roles')): ?>
+                                    <li><a href="admin_roles.php"><i class="icon-Commit"><span class="path1"></span><span
+                                                    class="path2"></span></i>Roles</a></li>
+                                <?php endif; ?>
+                            </ul>
+                        </li>
+                    <?php endif; ?>
+
+
                     <!-- <li class="header">Apps</li>
                     <li>
                         <a href="mailbox.php">
@@ -202,7 +177,7 @@
 
                 <div class="sidebar-widgets">
                     <div class="copyright text-start m-25">
-                        <p><strong class="d-block">Master Admin Dashboard</strong> © 2024 All Rights Reserved</p>
+                        <p><strong class="d-block">Real Estate Admin Dashboard</strong> © 2024 All Rights Reserved</p>
                     </div>
                 </div>
             </div>
