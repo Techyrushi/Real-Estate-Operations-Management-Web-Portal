@@ -2,98 +2,100 @@
 include 'includes/header.php';
 include 'includes/sidebar.php';
 
-// Fetch Stats
-$stats = [];
+$dashboard_error = '';
 
-// Total Projects
-$stmt = $pdo->query("SELECT COUNT(*) FROM projects");
-$stats['total_projects'] = $stmt->fetchColumn();
-
-// Total Units
-$stmt = $pdo->query("SELECT COUNT(*) FROM units");
-$stats['total_units'] = $stmt->fetchColumn();
-
-// Sold Units
-$stmt = $pdo->query("SELECT COUNT(*) FROM units WHERE status = 'Sold'");
-$stats['sold_units'] = $stmt->fetchColumn();
-
-// Available Units
-$stmt = $pdo->query("SELECT COUNT(*) FROM units WHERE status = 'Available'");
-$stats['available_units'] = $stmt->fetchColumn();
-
-// Total Collections (Income)
-$stmt = $pdo->query("SELECT SUM(amount) FROM payments");
-$stats['total_income'] = $stmt->fetchColumn() ?: 0;
-
-// Total Expenses
-$stmt = $pdo->query("SELECT SUM(amount) FROM expenses");
-$stats['total_expenses'] = $stmt->fetchColumn() ?: 0;
-
-// Receivables
-$stmt = $pdo->query("SELECT SUM(total_price) FROM bookings WHERE status != 'Cancelled'");
-$total_booked_value = $stmt->fetchColumn() ?: 0;
-$stats['receivables'] = $total_booked_value - $stats['total_income'];
-
-// Project Types
-$stmt = $pdo->query("SELECT type, COUNT(*) as count FROM projects GROUP BY type");
-$project_types = $stmt->fetchAll(PDO::FETCH_KEY_PAIR); // 'Residential' => 10, etc.
-
-// Partner Capital
-$partners = $pdo->query("SELECT * FROM partners")->fetchAll();
-foreach ($partners as &$p) {
-    $credits = $pdo->prepare("SELECT SUM(amount) FROM partner_ledger WHERE partner_id = ? AND type = 'Credit'");
-    $credits->execute([$p['id']]);
-    $total_credit = $credits->fetchColumn() ?: 0;
-
-    $debits = $pdo->prepare("SELECT SUM(amount) FROM partner_ledger WHERE partner_id = ? AND type = 'Debit'");
-    $debits->execute([$p['id']]);
-    $total_debit = $debits->fetchColumn() ?: 0;
-
-    $p['total_capital'] = $p['opening_capital'] + $total_credit - $total_debit;
-}
-unset($p); // Break reference
-usort($partners, function($a, $b) { return $b['total_capital'] <=> $a['total_capital']; });
-
-// Monthly Sales & Collections (Last 6 Months)
-// Note: This is a simplified query. In production, you'd want to generate a calendar table or handle missing months.
+$stats = [
+    'total_projects' => 0,
+    'total_units' => 0,
+    'sold_units' => 0,
+    'available_units' => 0,
+    'total_income' => 0,
+    'total_expenses' => 0,
+    'receivables' => 0,
+];
+$project_types = [];
+$partners = [];
 $months = [];
 $sales_data = [];
 $collections_data = [];
 $expenses_data = [];
+$recent_bookings = [];
 
-for ($i = 5; $i >= 0; $i--) {
-    $month_start = date('Y-m-01', strtotime("-$i months"));
-    $month_end = date('Y-m-t', strtotime("-$i months"));
-    $month_label = date('M Y', strtotime("-$i months"));
-    $months[] = $month_label;
+try {
+    $stmt = $pdo->query("SELECT COUNT(*) FROM projects");
+    $stats['total_projects'] = (int) $stmt->fetchColumn();
 
-    // Sales (Bookings)
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM bookings WHERE booking_date BETWEEN :start AND :end");
-    $stmt->execute(['start' => $month_start, 'end' => $month_end]);
-    $sales_data[] = $stmt->fetchColumn();
+    $stmt = $pdo->query("SELECT COUNT(*) FROM units");
+    $stats['total_units'] = (int) $stmt->fetchColumn();
 
-    // Collections (Payments)
-    $stmt = $pdo->prepare("SELECT SUM(amount) FROM payments WHERE payment_date BETWEEN :start AND :end");
-    $stmt->execute(['start' => $month_start, 'end' => $month_end]);
-    $collections_data[] = $stmt->fetchColumn() ?: 0;
+    $stmt = $pdo->query("SELECT COUNT(*) FROM units WHERE status = 'Sold'");
+    $stats['sold_units'] = (int) $stmt->fetchColumn();
 
-    // Expenses
-    $stmt = $pdo->prepare("SELECT SUM(amount) FROM expenses WHERE expense_date BETWEEN :start AND :end");
-    $stmt->execute(['start' => $month_start, 'end' => $month_end]);
-    $expenses_data[] = $stmt->fetchColumn() ?: 0;
+    $stmt = $pdo->query("SELECT COUNT(*) FROM units WHERE status = 'Available'");
+    $stats['available_units'] = (int) $stmt->fetchColumn();
+
+    $stmt = $pdo->query("SELECT SUM(amount) FROM payments");
+    $stats['total_income'] = (float) ($stmt->fetchColumn() ?: 0);
+
+    $stmt = $pdo->query("SELECT SUM(amount) FROM expenses");
+    $stats['total_expenses'] = (float) ($stmt->fetchColumn() ?: 0);
+
+    $stmt = $pdo->query("SELECT SUM(total_price) FROM bookings WHERE status != 'Cancelled'");
+    $total_booked_value = (float) ($stmt->fetchColumn() ?: 0);
+    $stats['receivables'] = $total_booked_value - $stats['total_income'];
+
+    $stmt = $pdo->query("SELECT type, COUNT(*) as count FROM projects GROUP BY type");
+    $project_types = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+
+    $partners = $pdo->query("SELECT * FROM partners")->fetchAll();
+    foreach ($partners as &$p) {
+        $credits = $pdo->prepare("SELECT SUM(amount) FROM partner_ledger WHERE partner_id = ? AND type = 'Credit'");
+        $credits->execute([$p['id']]);
+        $total_credit = (float) ($credits->fetchColumn() ?: 0);
+
+        $debits = $pdo->prepare("SELECT SUM(amount) FROM partner_ledger WHERE partner_id = ? AND type = 'Debit'");
+        $debits->execute([$p['id']]);
+        $total_debit = (float) ($debits->fetchColumn() ?: 0);
+
+        $p['total_capital'] = (float) $p['opening_capital'] + $total_credit - $total_debit;
+    }
+    unset($p);
+    usort($partners, function ($a, $b) {
+        return $b['total_capital'] <=> $a['total_capital'];
+    });
+
+    for ($i = 5; $i >= 0; $i--) {
+        $month_start = date('Y-m-01', strtotime("-$i months"));
+        $month_end = date('Y-m-t', strtotime("-$i months"));
+        $month_label = date('M Y', strtotime("-$i months"));
+        $months[] = $month_label;
+
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM bookings WHERE booking_date BETWEEN :start AND :end");
+        $stmt->execute(['start' => $month_start, 'end' => $month_end]);
+        $sales_data[] = (int) $stmt->fetchColumn();
+
+        $stmt = $pdo->prepare("SELECT SUM(amount) FROM payments WHERE payment_date BETWEEN :start AND :end");
+        $stmt->execute(['start' => $month_start, 'end' => $month_end]);
+        $collections_data[] = (float) ($stmt->fetchColumn() ?: 0);
+
+        $stmt = $pdo->prepare("SELECT SUM(amount) FROM expenses WHERE expense_date BETWEEN :start AND :end");
+        $stmt->execute(['start' => $month_start, 'end' => $month_end]);
+        $expenses_data[] = (float) ($stmt->fetchColumn() ?: 0);
+    }
+
+    $stmt = $pdo->query("
+        SELECT b.*, c.name as customer_name, u.flat_no, p.name as project_name, u.property_type as unit_type
+        FROM bookings b
+        JOIN customers c ON b.customer_id = c.id
+        JOIN units u ON b.unit_id = u.id
+        JOIN projects p ON u.project_id = p.id
+        ORDER BY b.booking_date DESC
+        LIMIT 10
+    ");
+    $recent_bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $dashboard_error = $e->getMessage();
 }
-
-// Recent Bookings (Property Overview)
-$stmt = $pdo->query("
-    SELECT b.*, c.name as customer_name, u.unit_number, p.name as project_name, u.type as unit_type
-    FROM bookings b
-    JOIN customers c ON b.customer_id = c.id
-    JOIN units u ON b.unit_id = u.id
-    JOIN projects p ON u.project_id = p.id
-    ORDER BY b.booking_date DESC
-    LIMIT 10
-");
-$recent_bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 ?>
 <!-- Content Wrapper. Contains page content -->
@@ -101,6 +103,11 @@ $recent_bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
 	<div class="container-full">
 		<!-- Main content -->
 		<section class="content">
+            <?php if ($dashboard_error): ?>
+                <div class="alert alert-danger">
+                    Dashboard data error: <?php echo htmlspecialchars($dashboard_error); ?>
+                </div>
+            <?php endif; ?>
 			<div class="row">
                 <!-- Stats Cards -->
 				<div class="col-xl-3 col-md-6 col-12">
@@ -277,7 +284,7 @@ $recent_bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                         <?php foreach ($recent_bookings as $booking): ?>
 										<tr>
 											<td><?php echo htmlspecialchars($booking['customer_name']); ?></td>
-											<td><?php echo htmlspecialchars($booking['unit_number']); ?></td>
+											<td><?php echo htmlspecialchars($booking['flat_no']); ?></td>   
 											<td><?php echo htmlspecialchars($booking['project_name']); ?></td>
 											<td><?php echo htmlspecialchars($booking['unit_type']); ?></td>
 											<td><?php echo date('d-m-Y', strtotime($booking['booking_date'])); ?></td>

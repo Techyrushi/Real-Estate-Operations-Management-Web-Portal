@@ -4,7 +4,7 @@
         <div class="user-profile px-30 py-15">
             <div class="text-center">
                 <div class="image">
-                    <img src="<?php echo !empty($_SESSION['profile_image']) ? $_SESSION['profile_image'] : '../images/avatar/1.jpg'; ?>"
+                    <img src="<?php echo !empty($_SESSION['profile_image']) ? $_SESSION['profile_image'] : '../images/avatar/9.jpg'; ?>"
                         class="avatar avatar-xxxl box-shadowed" alt="User Image">
                 </div>
                 <div class="info mt-20">
@@ -101,8 +101,8 @@
                         </ul>
                     </li>
 
-                    <li class="header">ANALYTICS</li>
                     <?php if (hasRole('Admin') || hasPermission('view_reports')): ?>
+                        <li class="header">ANALYTICS</li>
                         <li>
                             <a href="admin_reports.php">
                                 <i data-feather="pie-chart"></i>
@@ -177,7 +177,8 @@
 
                 <div class="sidebar-widgets">
                     <div class="copyright text-start m-25">
-                        <p><strong class="d-block">Real Estate Admin Dashboard</strong> © 2024 All Rights Reserved</p>
+                        <p><strong class="d-block">Real Estate Admin Dashboard</strong> © <?php echo date('Y'); ?> All
+                            Rights Reserved</p>
                     </div>
                 </div>
             </div>

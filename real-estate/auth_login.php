@@ -116,7 +116,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 										<!-- /.col -->
 										<div class="col-6">
 										 <div class="fog-pwd text-end">
-											<a href="auth_user_pass.php" class="hover-warning"><i class="ion ion-locked"></i> Forgot pwd?</a><br>
+											<a href="auth_user_pass.php" class="hover-warning"><i class="ion ion-locked"></i> Forgot password?</a><br>
 										  </div>
 										</div>
 										<!-- /.col -->

@@ -20,6 +20,30 @@ $vendor_filter = $_GET['vendor_id'] ?? '';
 $project_options = $pdo->query("SELECT id, name FROM projects ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
 $vendor_options = $pdo->query("SELECT id, name FROM vendors ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
 
+$filter_params = [];
+if ($from_date !== '') {
+    $filter_params['from_date'] = $from_date;
+}
+if ($to_date !== '') {
+    $filter_params['to_date'] = $to_date;
+}
+if ($project_filter !== '') {
+    $filter_params['project_id'] = $project_filter;
+}
+if ($vendor_filter !== '') {
+    $filter_params['vendor_id'] = $vendor_filter;
+}
+
+$tab_urls = [
+    'financial' => 'admin_reports.php?' . http_build_query(array_merge($filter_params, ['tab' => 'financial'])),
+    'partners' => 'admin_reports.php?' . http_build_query(array_merge($filter_params, ['tab' => 'partners'])),
+    'outstanding' => 'admin_reports.php?' . http_build_query(array_merge($filter_params, ['tab' => 'outstanding'])),
+    'aging' => 'admin_reports.php?' . http_build_query(array_merge($filter_params, ['tab' => 'aging'])),
+    'expenses' => 'admin_reports.php?' . http_build_query(array_merge($filter_params, ['tab' => 'expenses'])),
+    'vendor90' => 'admin_reports.php?' . http_build_query(array_merge($filter_params, ['tab' => 'vendor90'])),
+    'cashflow' => 'admin_reports.php?' . http_build_query(array_merge($filter_params, ['tab' => 'cashflow'])),
+];
+
 // 1. Financial Summary Data
 $financials = [];
 if ($tab == 'financial') {
@@ -298,7 +322,7 @@ if ($tab == 'vendor90') {
 $cashflow_data = [];
 if ($tab == 'cashflow') {
     $sql = "SELECT 'Sales' as category, p.payment_date as date, 
-                   CONCAT('Payment from ', c.name, ' (Unit ', u.unit_number, ')') as description,
+                   CONCAT('Payment from ', c.name, ' (Unit ', IFNULL(u.flat_no, ''), ')') as description,
                    p.amount as inflow, 0 as outflow, p.payment_method as mode
             FROM payments p
             JOIN bookings b ON p.booking_id = b.id
@@ -325,6 +349,102 @@ if ($tab == 'cashflow') {
             ORDER BY date DESC";
             
     $cashflow_data = $pdo->query($sql)->fetchAll();
+}
+
+$financial_summary = [
+    'total_sales' => 0,
+    'total_received' => 0,
+    'total_expenses' => 0,
+    'total_balance' => 0,
+];
+if (!empty($financials)) {
+    foreach ($financials as $row) {
+        $financial_summary['total_sales'] += (float)$row['sales'];
+        $financial_summary['total_received'] += (float)$row['received'];
+        $financial_summary['total_expenses'] += (float)$row['expenses'];
+        $financial_summary['total_balance'] += (float)$row['balance'];
+    }
+}
+
+$partners_summary = [
+    'count' => 0,
+    'total_opening' => 0,
+    'total_current' => 0,
+];
+if (!empty($partners_data)) {
+    $partners_summary['count'] = count($partners_data);
+    foreach ($partners_data as $row) {
+        $partners_summary['total_opening'] += (float)$row['opening'];
+        $partners_summary['total_current'] += (float)$row['current'];
+    }
+}
+
+$outstanding_summary = [
+    'customers' => 0,
+    'total_balance' => 0,
+];
+if (!empty($outstanding_data)) {
+    foreach ($outstanding_data as $row) {
+        if ($row['balance'] > 0) {
+            $outstanding_summary['customers']++;
+            $outstanding_summary['total_balance'] += (float)$row['balance'];
+        }
+    }
+}
+
+$aging_buckets_summary = [
+    '0-30' => 0,
+    '31-60' => 0,
+    '61-90' => 0,
+    '90+' => 0,
+];
+if (!empty($aging_data)) {
+    foreach ($aging_data as $row) {
+        $bucket = $row['bucket'];
+        if (!isset($aging_buckets_summary[$bucket])) {
+            $aging_buckets_summary[$bucket] = 0;
+        }
+        $aging_buckets_summary[$bucket] += (float)$row['balance'];
+    }
+}
+
+$expenses_summary = [
+    'count' => 0,
+    'total_amount' => 0,
+    'total_gst' => 0,
+    'total_total' => 0,
+];
+if (!empty($expenses_data)) {
+    $expenses_summary['count'] = count($expenses_data);
+    foreach ($expenses_data as $row) {
+        $amount = (float)($row['amount'] ?? 0);
+        $gst = (float)($row['gst_amount'] ?? 0);
+        $expenses_summary['total_amount'] += $amount;
+        $expenses_summary['total_gst'] += $gst;
+        $expenses_summary['total_total'] += $amount + $gst;
+    }
+}
+
+$vendor_summary = [
+    'vendors' => 0,
+    'total_spent' => 0,
+];
+if (!empty($vendor_activity)) {
+    $vendor_summary['vendors'] = count($vendor_activity);
+    foreach ($vendor_activity as $row) {
+        $vendor_summary['total_spent'] += (float)$row['total_spent'];
+    }
+}
+
+$cashflow_summary = [
+    'total_in' => 0,
+    'total_out' => 0,
+];
+if (!empty($cashflow_data)) {
+    foreach ($cashflow_data as $row) {
+        $cashflow_summary['total_in'] += (float)$row['inflow'];
+        $cashflow_summary['total_out'] += (float)$row['outflow'];
+    }
 }
 
 if (isset($_GET['export'])) {
@@ -407,6 +527,11 @@ if (isset($_GET['export'])) {
         exit;
     }
 }
+
+$export_financial_query = http_build_query(array_merge($filter_params, ['tab' => 'financial', 'export' => 'financial_excel']));
+$export_aging_query = http_build_query(array_merge($filter_params, ['tab' => 'aging', 'export' => 'aging_excel']));
+$export_expenses_query = http_build_query(array_merge($filter_params, ['tab' => 'expenses', 'export' => 'expenses_excel']));
+$export_vendor90_query = http_build_query(array_merge($filter_params, ['tab' => 'vendor90', 'export' => 'vendor90_excel']));
 ?>
 
 <div class="content-wrapper">
@@ -420,21 +545,122 @@ if (isset($_GET['export'])) {
     </div>
 
     <section class="content">
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="box">
+                    <div class="box-body">
+                        <form method="GET" action="admin_reports.php" class="row g-2 align-items-end">
+                            <input type="hidden" name="tab" value="<?php echo htmlspecialchars($tab); ?>">
+                            <div class="col-md-2">
+                                <label class="form-label">From Date</label>
+                                <input type="date" name="from_date" class="form-control" value="<?php echo htmlspecialchars($from_date); ?>">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">To Date</label>
+                                <input type="date" name="to_date" class="form-control" value="<?php echo htmlspecialchars($to_date); ?>">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Project</label>
+                                <select name="project_id" class="form-select">
+                                    <option value="">All Projects</option>
+                                    <?php foreach ($project_options as $p): ?>
+                                        <option value="<?php echo $p['id']; ?>" <?php echo $project_filter == $p['id'] ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($p['name']); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Vendor (for expense/vendor reports)</label>
+                                <select name="vendor_id" class="form-select">
+                                    <option value="">All Vendors</option>
+                                    <?php foreach ($vendor_options as $v): ?>
+                                        <option value="<?php echo $v['id']; ?>" <?php echo $vendor_filter == $v['id'] ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($v['name']); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Search</label>
+                                <input type="text" id="reportSearch" class="form-control" placeholder="Search in table">
+                            </div>
+                            <div class="col-md-12 mt-2 d-flex justify-content-between">
+                                <div class="text-muted small">
+                                    Filters apply to all relevant tabs. Search works on the active table.
+                                </div>
+                                <div>
+                                    <button type="submit" class="btn btn-primary me-2"><i class="ti-search"></i> Apply</button>
+                                    <a href="<?php echo htmlspecialchars('admin_reports.php?tab=' . urlencode($tab)); ?>" class="btn btn-secondary"><i class="ti-reload"></i></a>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="row">
             <div class="col-12">
                 <div class="nav-tabs-custom">
                     <ul class="nav nav-tabs">
-                        <li><a href="?tab=financial" class="<?php echo $tab == 'financial' ? 'active' : ''; ?>">Financial Summary</a></li>
-                        <li><a href="?tab=partners" class="<?php echo $tab == 'partners' ? 'active' : ''; ?>">Partner Capital</a></li>
-                        <li><a href="?tab=outstanding" class="<?php echo $tab == 'outstanding' ? 'active' : ''; ?>">Outstanding Receivables</a></li>
-                        <li><a href="?tab=cashflow" class="<?php echo $tab == 'cashflow' ? 'active' : ''; ?>">Cash Flow</a></li>
+                        <li><a href="<?php echo htmlspecialchars($tab_urls['financial']); ?>" class="<?php echo $tab == 'financial' ? 'active' : ''; ?>">Financial Summary</a></li>
+                        <li><a href="<?php echo htmlspecialchars($tab_urls['partners']); ?>" class="<?php echo $tab == 'partners' ? 'active' : ''; ?>">Partner Capital</a></li>
+                        <li><a href="<?php echo htmlspecialchars($tab_urls['outstanding']); ?>" class="<?php echo $tab == 'outstanding' ? 'active' : ''; ?>">Outstanding Receivables</a></li>
+                        <li><a href="<?php echo htmlspecialchars($tab_urls['aging']); ?>" class="<?php echo $tab == 'aging' ? 'active' : ''; ?>">Receivables Aging</a></li>
+                        <li><a href="<?php echo htmlspecialchars($tab_urls['expenses']); ?>" class="<?php echo $tab == 'expenses' ? 'active' : ''; ?>">Expense Ledger</a></li>
+                        <li><a href="<?php echo htmlspecialchars($tab_urls['vendor90']); ?>" class="<?php echo $tab == 'vendor90' ? 'active' : ''; ?>">Vendor Activity</a></li>
+                        <li><a href="<?php echo htmlspecialchars($tab_urls['cashflow']); ?>" class="<?php echo $tab == 'cashflow' ? 'active' : ''; ?>">Cash Flow</a></li>
                     </ul>
 
                     <div class="tab-content">
-                        <!-- Financial Summary Tab -->
                         <div class="tab-pane <?php echo $tab == 'financial' ? 'active' : ''; ?>" id="financial">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h5 class="mb-0">Project-wise Financial Summary</h5>
+                                <div>
+                                    <?php if (!empty($financials)): ?>
+                                        <button type="button" class="btn btn-secondary btn-sm me-2" onclick="printReportSection('financial')">
+                                            <i class="ti-printer"></i> Print / PDF
+                                        </button>
+                                        <a href="admin_reports.php?<?php echo htmlspecialchars($export_financial_query); ?>" class="btn btn-success btn-sm">
+                                            <i class="ti-download"></i> Export Excel
+                                        </a>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-12">
+                                    <div id="financial_bar_chart" style="height: 320px;"></div>
+                                </div>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-3 col-6 mb-2">
+                                    <div class="p-2 bg-light rounded">
+                                        <div class="text-muted small">Total Deal Value</div>
+                                        <div class="h5 mb-0">₹ <?php echo number_format($financial_summary['total_sales'], 2); ?></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 col-6 mb-2">
+                                    <div class="p-2 bg-light rounded">
+                                        <div class="text-muted small">Total Collections</div>
+                                        <div class="h5 mb-0">₹ <?php echo number_format($financial_summary['total_received'], 2); ?></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 col-6 mb-2">
+                                    <div class="p-2 bg-light rounded">
+                                        <div class="text-muted small">Total Expenses</div>
+                                        <div class="h5 mb-0">₹ <?php echo number_format($financial_summary['total_expenses'], 2); ?></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 col-6 mb-2">
+                                    <div class="p-2 bg-light rounded">
+                                        <div class="text-muted small">Net Cash Flow</div>
+                                        <div class="h5 mb-0 <?php echo $financial_summary['total_balance'] >= 0 ? 'text-success' : 'text-danger'; ?>">₹ <?php echo number_format($financial_summary['total_balance'], 2); ?></div>
+                                    </div>
+                                </div>
+                            </div>
                             <div class="table-responsive">
-                                <table class="table table-bordered table-hover">
+                                <table class="table table-bordered table-hover report-table">
                                     <thead class="bg-primary text-white">
                                         <tr>
                                             <th>Project</th>
@@ -445,7 +671,7 @@ if (isset($_GET['export'])) {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <?php if(!empty($financials)): foreach ($financials as $row): ?>
+                                        <?php if (!empty($financials)): foreach ($financials as $row): ?>
                                         <tr>
                                             <td><strong><?php echo htmlspecialchars($row['project']); ?></strong></td>
                                             <td class="text-end">₹ <?php echo number_format($row['sales'], 2); ?></td>
@@ -463,10 +689,37 @@ if (isset($_GET['export'])) {
                             </div>
                         </div>
 
-                        <!-- Partner Capital Tab -->
                         <div class="tab-pane <?php echo $tab == 'partners' ? 'active' : ''; ?>" id="partners">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h5 class="mb-0">Partner Capital & Share</h5>
+                                <?php if (!empty($partners_data)): ?>
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="printReportSection('partners')">
+                                        <i class="ti-printer"></i> Print / PDF
+                                    </button>
+                                <?php endif; ?>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-4 col-12 mb-2">
+                                    <div class="p-2 bg-light rounded">
+                                        <div class="text-muted small">Total Partners</div>
+                                        <div class="h5 mb-0"><?php echo (int)$partners_summary['count']; ?></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 col-6 mb-2">
+                                    <div class="p-2 bg-light rounded">
+                                        <div class="text-muted small">Total Opening Capital</div>
+                                        <div class="h5 mb-0">₹ <?php echo number_format($partners_summary['total_opening'], 2); ?></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 col-6 mb-2">
+                                    <div class="p-2 bg-light rounded">
+                                        <div class="text-muted small">Total Current Capital</div>
+                                        <div class="h5 mb-0">₹ <?php echo number_format($partners_summary['total_current'], 2); ?></div>
+                                    </div>
+                                </div>
+                            </div>
                             <div class="table-responsive">
-                                <table class="table table-striped">
+                                <table class="table table-striped report-table">
                                     <thead>
                                         <tr>
                                             <th>Partner Name</th>
@@ -477,7 +730,7 @@ if (isset($_GET['export'])) {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <?php if(!empty($partners_data)): foreach ($partners_data as $row): ?>
+                                        <?php if (!empty($partners_data)): foreach ($partners_data as $row): ?>
                                         <tr>
                                             <td><?php echo htmlspecialchars($row['name']); ?></td>
                                             <td class="text-end">₹ <?php echo number_format($row['opening'], 2); ?></td>
@@ -493,10 +746,31 @@ if (isset($_GET['export'])) {
                             </div>
                         </div>
 
-                        <!-- Outstanding Tab -->
                         <div class="tab-pane <?php echo $tab == 'outstanding' ? 'active' : ''; ?>" id="outstanding">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h5 class="mb-0">Outstanding Receivables</h5>
+                                <?php if (!empty($outstanding_data)): ?>
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="printReportSection('outstanding')">
+                                        <i class="ti-printer"></i> Print / PDF
+                                    </button>
+                                <?php endif; ?>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-6 col-12 mb-2">
+                                    <div class="p-2 bg-light rounded">
+                                        <div class="text-muted small">Customers With Outstanding</div>
+                                        <div class="h5 mb-0"><?php echo (int)$outstanding_summary['customers']; ?></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 col-12 mb-2">
+                                    <div class="p-2 bg-light rounded">
+                                        <div class="text-muted small">Total Outstanding Amount</div>
+                                        <div class="h5 mb-0 text-danger">₹ <?php echo number_format($outstanding_summary['total_balance'], 2); ?></div>
+                                    </div>
+                                </div>
+                            </div>
                             <div class="table-responsive">
-                                <table class="table table-hover">
+                                <table class="table table-hover report-table">
                                     <thead>
                                         <tr>
                                             <th>Customer</th>
@@ -508,7 +782,7 @@ if (isset($_GET['export'])) {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <?php if(!empty($outstanding_data)): foreach ($outstanding_data as $row): ?>
+                                        <?php if (!empty($outstanding_data)): foreach ($outstanding_data as $row): ?>
                                         <tr>
                                             <td><?php echo htmlspecialchars($row['name']); ?></td>
                                             <td><?php echo htmlspecialchars($row['project']); ?></td>
@@ -525,10 +799,268 @@ if (isset($_GET['export'])) {
                             </div>
                         </div>
 
-                        <!-- Cash Flow Tab -->
-                        <div class="tab-pane <?php echo $tab == 'cashflow' ? 'active' : ''; ?>" id="cashflow">
+                        <div class="tab-pane <?php echo $tab == 'aging' ? 'active' : ''; ?>" id="aging">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h5 class="mb-0">Customer Receivables Aging</h5>
+                                <div>
+                                    <?php if (!empty($aging_data)): ?>
+                                        <button type="button" class="btn btn-secondary btn-sm me-2" onclick="printReportSection('aging')">
+                                            <i class="ti-printer"></i> Print / PDF
+                                        </button>
+                                        <a href="admin_reports.php?<?php echo htmlspecialchars($export_aging_query); ?>" class="btn btn-success btn-sm">
+                                            <i class="ti-download"></i> Export Excel
+                                        </a>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-12">
+                                    <div id="aging_bar_chart" style="height: 320px;"></div>
+                                </div>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-3 col-6 mb-2">
+                                    <div class="p-2 bg-light rounded">
+                                        <div class="text-muted small">0-30 Days</div>
+                                        <div class="h6 mb-0 text-danger">₹ <?php echo number_format($aging_buckets_summary['0-30'] ?? 0, 2); ?></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 col-6 mb-2">
+                                    <div class="p-2 bg-light rounded">
+                                        <div class="text-muted small">31-60 Days</div>
+                                        <div class="h6 mb-0 text-danger">₹ <?php echo number_format($aging_buckets_summary['31-60'] ?? 0, 2); ?></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 col-6 mb-2">
+                                    <div class="p-2 bg-light rounded">
+                                        <div class="text-muted small">61-90 Days</div>
+                                        <div class="h6 mb-0 text-danger">₹ <?php echo number_format($aging_buckets_summary['61-90'] ?? 0, 2); ?></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 col-6 mb-2">
+                                    <div class="p-2 bg-light rounded">
+                                        <div class="text-muted small">90+ Days</div>
+                                        <div class="h6 mb-0 text-danger">₹ <?php echo number_format($aging_buckets_summary['90+'] ?? 0, 2); ?></div>
+                                    </div>
+                                </div>
+                            </div>
                             <div class="table-responsive">
-                                <table class="table table-striped table-hover">
+                                <table class="table table-striped table-hover report-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Customer</th>
+                                            <th>Project</th>
+                                            <th>Booking Date</th>
+                                            <th class="text-end">Total Deal</th>
+                                            <th class="text-end">Paid</th>
+                                            <th class="text-end">Balance</th>
+                                            <th class="text-end">Days</th>
+                                            <th>Aging Bucket</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php if (!empty($aging_data)): foreach ($aging_data as $row): ?>
+                                        <tr>
+                                            <td><?php echo htmlspecialchars($row['name']); ?></td>
+                                            <td><?php echo htmlspecialchars($row['project']); ?></td>
+                                            <td><?php echo htmlspecialchars($row['booking_date']); ?></td>
+                                            <td class="text-end">₹ <?php echo number_format($row['deal_value'], 2); ?></td>
+                                            <td class="text-end text-success">₹ <?php echo number_format($row['paid'], 2); ?></td>
+                                            <td class="text-end text-danger fw-bold">₹ <?php echo number_format($row['balance'], 2); ?></td>
+                                            <td class="text-end"><?php echo (int)$row['days']; ?></td>
+                                            <td><span class="badge bg-info"><?php echo htmlspecialchars($row['bucket']); ?></span></td>
+                                            <td><a href="admin_customer_ledger.php?customer_id=<?php echo $row['id']; ?>" class="btn btn-xs btn-warning">View</a></td>
+                                        </tr>
+                                        <?php endforeach; else: ?>
+                                            <tr><td colspan="9" class="text-center">No aging data available.</td></tr>
+                                        <?php endif; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="tab-pane <?php echo $tab == 'expenses' ? 'active' : ''; ?>" id="expenses">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h5 class="mb-0">Expense Ledger (Project / Vendor)</h5>
+                                <div>
+                                    <?php if (!empty($expenses_data)): ?>
+                                        <button type="button" class="btn btn-secondary btn-sm me-2" onclick="printReportSection('expenses')">
+                                            <i class="ti-printer"></i> Print / PDF
+                                        </button>
+                                        <a href="admin_reports.php?<?php echo htmlspecialchars($export_expenses_query); ?>" class="btn btn-success btn-sm">
+                                            <i class="ti-download"></i> Export Excel
+                                        </a>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-3 col-6 mb-2">
+                                    <div class="p-2 bg-light rounded">
+                                        <div class="text-muted small">Bills</div>
+                                        <div class="h6 mb-0"><?php echo (int)$expenses_summary['count']; ?></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 col-6 mb-2">
+                                    <div class="p-2 bg-light rounded">
+                                        <div class="text-muted small">Amount</div>
+                                        <div class="h6 mb-0">₹ <?php echo number_format($expenses_summary['total_amount'], 2); ?></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 col-6 mb-2">
+                                    <div class="p-2 bg-light rounded">
+                                        <div class="text-muted small">GST</div>
+                                        <div class="h6 mb-0">₹ <?php echo number_format($expenses_summary['total_gst'], 2); ?></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 col-6 mb-2">
+                                    <div class="p-2 bg-light rounded">
+                                        <div class="text-muted small">Total</div>
+                                        <div class="h6 mb-0">₹ <?php echo number_format($expenses_summary['total_total'], 2); ?></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-striped table-hover report-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Project</th>
+                                            <th>Vendor</th>
+                                            <th>Material</th>
+                                            <th class="text-end">Amount</th>
+                                            <th class="text-end">GST</th>
+                                            <th class="text-end">Total</th>
+                                            <th>Mode</th>
+                                            <th>Reference</th>
+                                            <th>Remarks</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php if (!empty($expenses_data)): foreach ($expenses_data as $row): ?>
+                                        <tr>
+                                            <td><?php echo htmlspecialchars($row['expense_date']); ?></td>
+                                            <td><?php echo htmlspecialchars($row['project_name'] ?? ''); ?></td>
+                                            <td><?php echo htmlspecialchars($row['vendor_name'] ?? ''); ?></td>
+                                            <td><?php echo htmlspecialchars($row['material_name'] ?? ''); ?></td>
+                                            <td class="text-end">₹ <?php echo number_format($row['amount'], 2); ?></td>
+                                            <td class="text-end">₹ <?php echo number_format($row['gst_amount'], 2); ?></td>
+                                            <td class="text-end">
+                                                <?php 
+                                                $total = ($row['amount'] ?? 0) + ($row['gst_amount'] ?? 0);
+                                                echo '₹ ' . number_format($total, 2);
+                                                ?>
+                                            </td>
+                                            <td><?php echo htmlspecialchars($row['payment_mode'] ?? ''); ?></td>
+                                            <td><?php echo htmlspecialchars($row['reference_no'] ?? ''); ?></td>
+                                            <td><?php echo htmlspecialchars($row['remarks'] ?? ''); ?></td>
+                                        </tr>
+                                        <?php endforeach; else: ?>
+                                            <tr><td colspan="10" class="text-center">No expense data available.</td></tr>
+                                        <?php endif; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="tab-pane <?php echo $tab == 'vendor90' ? 'active' : ''; ?>" id="vendor90">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h5 class="mb-0">Vendor 90-day Activity</h5>
+                                <div>
+                                    <?php if (!empty($vendor_activity)): ?>
+                                        <button type="button" class="btn btn-secondary btn-sm me-2" onclick="printReportSection('vendor90')">
+                                            <i class="ti-printer"></i> Print / PDF
+                                        </button>
+                                        <a href="admin_reports.php?<?php echo htmlspecialchars($export_vendor90_query); ?>" class="btn btn-success btn-sm">
+                                            <i class="ti-download"></i> Export Excel
+                                        </a>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-12">
+                                    <div id="vendor_spend_chart" style="height: 320px;"></div>
+                                </div>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-6 col-12 mb-2">
+                                    <div class="p-2 bg-light rounded">
+                                        <div class="text-muted small">Active Vendors</div>
+                                        <div class="h6 mb-0"><?php echo (int)$vendor_summary['vendors']; ?></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 col-12 mb-2">
+                                    <div class="p-2 bg-light rounded">
+                                        <div class="text-muted small">Total Spent (90 days)</div>
+                                        <div class="h6 mb-0">₹ <?php echo number_format($vendor_summary['total_spent'], 2); ?></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-striped table-hover report-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Vendor</th>
+                                            <th class="text-end">Total Spent</th>
+                                            <th class="text-end">Bills Count</th>
+                                            <th>First Transaction</th>
+                                            <th>Last Transaction</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php if (!empty($vendor_activity)): foreach ($vendor_activity as $row): ?>
+                                        <tr>
+                                            <td><?php echo htmlspecialchars($row['name']); ?></td>
+                                            <td class="text-end">₹ <?php echo number_format($row['total_spent'], 2); ?></td>
+                                            <td class="text-end"><?php echo (int)$row['bills_count']; ?></td>
+                                            <td><?php echo htmlspecialchars($row['first_txn']); ?></td>
+                                            <td><?php echo htmlspecialchars($row['last_txn']); ?></td>
+                                        </tr>
+                                        <?php endforeach; else: ?>
+                                            <tr><td colspan="5" class="text-center">No vendor activity in the last 90 days.</td></tr>
+                                        <?php endif; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="tab-pane <?php echo $tab == 'cashflow' ? 'active' : ''; ?>" id="cashflow">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h5 class="mb-0">Cash Flow Statement</h5>
+                                <?php if (!empty($cashflow_data)): ?>
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="printReportSection('cashflow')">
+                                        <i class="ti-printer"></i> Print / PDF
+                                    </button>
+                                <?php endif; ?>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-12">
+                                    <div id="cashflow_line_chart" style="height: 320px;"></div>
+                                </div>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-4 col-12 mb-2">
+                                    <div class="p-2 bg-light rounded">
+                                        <div class="text-muted small">Total Inflow</div>
+                                        <div class="h6 mb-0 text-success">₹ <?php echo number_format($cashflow_summary['total_in'], 2); ?></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 col-12 mb-2">
+                                    <div class="p-2 bg-light rounded">
+                                        <div class="text-muted small">Total Outflow</div>
+                                        <div class="h6 mb-0 text-danger">₹ <?php echo number_format($cashflow_summary['total_out'], 2); ?></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 col-12 mb-2">
+                                    <div class="p-2 bg-light rounded">
+                                        <div class="text-muted small">Net Cash Flow</div>
+                                        <?php $net_cf = $cashflow_summary['total_in'] - $cashflow_summary['total_out']; ?>
+                                        <div class="h6 mb-0 <?php echo $net_cf >= 0 ? 'text-success' : 'text-danger'; ?>">₹ <?php echo number_format($net_cf, 2); ?></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-striped table-hover report-table">
                                     <thead>
                                         <tr>
                                             <th>Date</th>
@@ -543,7 +1075,7 @@ if (isset($_GET['export'])) {
                                         <?php 
                                         $total_in = 0;
                                         $total_out = 0;
-                                        if(!empty($cashflow_data)): foreach ($cashflow_data as $row): 
+                                        if (!empty($cashflow_data)): foreach ($cashflow_data as $row): 
                                             $total_in += $row['inflow'];
                                             $total_out += $row['outflow'];
                                         ?>
@@ -590,4 +1122,279 @@ if (isset($_GET['export'])) {
   </div>
 </div>
 
-<?php include 'includes/footer.php'; ?>
+<?php
+$hide_dashboard_js = true;
+
+$financial_labels_json = '[]';
+$financial_sales_json = '[]';
+$financial_received_json = '[]';
+$financial_expenses_json = '[]';
+
+if (!empty($financials)) {
+    $financial_labels = [];
+    $financial_sales_data = [];
+    $financial_received_data = [];
+    $financial_expenses_data = [];
+    foreach ($financials as $row) {
+        $financial_labels[] = $row['project'];
+        $financial_sales_data[] = (float)$row['sales'];
+        $financial_received_data[] = (float)$row['received'];
+        $financial_expenses_data[] = (float)$row['expenses'];
+    }
+    $financial_labels_json = json_encode($financial_labels);
+    $financial_sales_json = json_encode($financial_sales_data);
+    $financial_received_json = json_encode($financial_received_data);
+    $financial_expenses_json = json_encode($financial_expenses_data);
+}
+
+$aging_bucket_labels_json = '[]';
+$aging_bucket_values_json = '[]';
+if (!empty($aging_buckets_summary)) {
+    $aging_bucket_labels_json = json_encode(array_keys($aging_buckets_summary));
+    $aging_bucket_values_json = json_encode(array_values($aging_buckets_summary));
+}
+
+$vendor_labels_json = '[]';
+$vendor_values_json = '[]';
+if (!empty($vendor_activity)) {
+    $vendor_labels = [];
+    $vendor_values = [];
+    $count = 0;
+    foreach ($vendor_activity as $row) {
+        $vendor_labels[] = $row['name'];
+        $vendor_values[] = (float)$row['total_spent'];
+        $count++;
+        if ($count >= 8) {
+            break;
+        }
+    }
+    $vendor_labels_json = json_encode($vendor_labels);
+    $vendor_values_json = json_encode($vendor_values);
+}
+
+$cashflow_dates_json = '[]';
+$cashflow_inflow_json = '[]';
+$cashflow_outflow_json = '[]';
+$cashflow_net_json = '[]';
+if (!empty($cashflow_data)) {
+    $daily = [];
+    foreach ($cashflow_data as $row) {
+        $dateKey = $row['date'];
+        if (!isset($daily[$dateKey])) {
+            $daily[$dateKey] = [
+                'in' => 0,
+                'out' => 0,
+            ];
+        }
+        $daily[$dateKey]['in'] += (float)$row['inflow'];
+        $daily[$dateKey]['out'] += (float)$row['outflow'];
+    }
+    ksort($daily);
+    $dates = [];
+    $inflowSeries = [];
+    $outflowSeries = [];
+    $netSeries = [];
+    foreach ($daily as $dateKey => $vals) {
+        $dates[] = date('d-M', strtotime($dateKey));
+        $inflowSeries[] = $vals['in'];
+        $outflowSeries[] = $vals['out'];
+        $netSeries[] = $vals['in'] - $vals['out'];
+    }
+    $cashflow_dates_json = json_encode($dates);
+    $cashflow_inflow_json = json_encode($inflowSeries);
+    $cashflow_outflow_json = json_encode($outflowSeries);
+    $cashflow_net_json = json_encode($netSeries);
+}
+
+$extra_js = <<<EOT
+<script>
+$(function () {
+    'use strict';
+
+    window.printReportSection = function (tabId) {
+        var pane = $('.tab-content .tab-pane#' + tabId);
+        if (!pane.length) {
+            return;
+        }
+        var printWindow = window.open('', '_blank');
+        var html = '<html><head><title>Report</title>';
+        html += '<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:16px;} table{width:100%;border-collapse:collapse;} th,td{border:1px solid #e5e7eb;padding:6px 8px;font-size:13px;} .text-end{text-align:right;} .text-center{text-align:center;} .text-success{color:#16a34a;} .text-danger{color:#dc2626;} .bg-light{background-color:#f9fafb;}</style>';
+        html += '</head><body>' + pane.html() + '</body></html>';
+        printWindow.document.open();
+        printWindow.document.write(html);
+        printWindow.document.close();
+        printWindow.focus();
+        printWindow.print();
+    };
+
+    $('#reportSearch').on('keyup', function () {
+        var term = $(this).val().toLowerCase();
+        $('.tab-content .tab-pane.active .report-table tbody tr').each(function () {
+            var text = $(this).text().toLowerCase();
+            $(this).toggle(text.indexOf(term) !== -1);
+        });
+    });
+
+    var finLabels = $financial_labels_json;
+    var finSales = $financial_sales_json;
+    var finReceived = $financial_received_json;
+    var finExpenses = $financial_expenses_json;
+
+    if (finLabels.length > 0 && $('#financial_bar_chart').length) {
+        var financialOptions = {
+            chart: {
+                height: 320,
+                type: 'bar',
+                stacked: false
+            },
+            series: [{
+                name: 'Total Deal',
+                data: finSales
+            }, {
+                name: 'Collections',
+                data: finReceived
+            }, {
+                name: 'Expenses',
+                data: finExpenses
+            }],
+            xaxis: {
+                categories: finLabels
+            },
+            dataLabels: {
+                enabled: false
+            },
+            legend: {
+                position: 'top'
+            },
+            tooltip: {
+                y: {
+                    formatter: function (val) {
+                        return '₹ ' + val.toFixed(2);
+                    }
+                }
+            }
+        };
+        var financialChart = new ApexCharts(document.querySelector('#financial_bar_chart'), financialOptions);
+        financialChart.render();
+    }
+
+    var agingLabels = $aging_bucket_labels_json;
+    var agingValues = $aging_bucket_values_json;
+
+    if (agingLabels.length > 0 && $('#aging_bar_chart').length) {
+        var agingOptions = {
+            chart: {
+                height: 320,
+                type: 'bar'
+            },
+            series: [{
+                name: 'Outstanding',
+                data: agingValues
+            }],
+            xaxis: {
+                categories: agingLabels
+            },
+            dataLabels: {
+                enabled: false
+            },
+            colors: ['#ff9f43'],
+            tooltip: {
+                y: {
+                    formatter: function (val) {
+                        return '₹ ' + val.toFixed(2);
+                    }
+                }
+            }
+        };
+        var agingChart = new ApexCharts(document.querySelector('#aging_bar_chart'), agingOptions);
+        agingChart.render();
+    }
+
+    var vendorLabels = $vendor_labels_json;
+    var vendorValues = $vendor_values_json;
+
+    if (vendorLabels.length > 0 && $('#vendor_spend_chart').length) {
+        var vendorOptions = {
+            chart: {
+                height: 320,
+                type: 'bar'
+            },
+            series: [{
+                name: 'Total Spent',
+                data: vendorValues
+            }],
+            xaxis: {
+                categories: vendorLabels
+            },
+            plotOptions: {
+                bar: {
+                    horizontal: true
+                }
+            },
+            dataLabels: {
+                enabled: false
+            },
+            colors: ['#17a2b8'],
+            tooltip: {
+                y: {
+                    formatter: function (val) {
+                        return '₹ ' + val.toFixed(2);
+                    }
+                }
+            }
+        };
+        var vendorChart = new ApexCharts(document.querySelector('#vendor_spend_chart'), vendorOptions);
+        vendorChart.render();
+    }
+
+    var cashDates = $cashflow_dates_json;
+    var cashIn = $cashflow_inflow_json;
+    var cashOut = $cashflow_outflow_json;
+    var cashNet = $cashflow_net_json;
+
+    if (cashDates.length > 0 && $('#cashflow_line_chart').length) {
+        var cashOptions = {
+            chart: {
+                height: 320,
+                type: 'area'
+            },
+            series: [{
+                name: 'Inflow',
+                data: cashIn
+            }, {
+                name: 'Outflow',
+                data: cashOut
+            }, {
+                name: 'Net',
+                data: cashNet
+            }],
+            xaxis: {
+                categories: cashDates
+            },
+            dataLabels: {
+                enabled: false
+            },
+            stroke: {
+                curve: 'smooth'
+            },
+            tooltip: {
+                y: {
+                    formatter: function (val) {
+                        return '₹ ' + val.toFixed(2);
+                    }
+                }
+            },
+            colors: ['#16a34a', '#dc2626', '#0ea5e9'],
+            legend: {
+                position: 'top'
+            }
+        };
+        var cashChart = new ApexCharts(document.querySelector('#cashflow_line_chart'), cashOptions);
+        cashChart.render();
+    }
+});
+</script>
+EOT;
+
+include 'includes/footer.php';
+?>

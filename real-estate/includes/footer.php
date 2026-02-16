@@ -1,7 +1,7 @@
 <!-- /.content-wrapper -->
 <footer class="main-footer text-center">
     &copy;
-    <?php echo date('Y'); ?> <a href="#">Malpure Group</a>. All Rights Reserved.
+    <?php echo date('Y'); ?> <a href="#">Real Estate Admin Dashboard</a>. All Rights Reserved.  
 </footer>
 
 <!-- Add the sidebar's background. This div must be placed immediately after the control sidebar -->

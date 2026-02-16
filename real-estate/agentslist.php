@@ -5,9 +5,9 @@ include 'includes/sidebar.php';
 $msg = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['follow_agent_id']) && isset($_SESSION['user_id'])) {
-    $agent_id = (int)$_POST['follow_agent_id'];
+    $agent_id = (int) $_POST['follow_agent_id'];
     if ($agent_id > 0) {
-        $user_id = (int)$_SESSION['user_id'];
+        $user_id = (int) $_SESSION['user_id'];
         $stmt = $pdo->prepare("SELECT id FROM user_follows WHERE user_id = ? AND entity_type = 'agent' AND entity_id = ?");
         $stmt->execute([$user_id, $agent_id]);
         if ($stmt->fetchColumn()) {
@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['follow_agent_id']) &&
 }
 
 if (isset($_GET['delete_id'])) {
-    $delete_id = (int)$_GET['delete_id'];
+    $delete_id = (int) $_GET['delete_id'];
     if ($delete_id > 0) {
         $stmt = $pdo->prepare("DELETE FROM agents WHERE id = ?");
         $stmt->execute([$delete_id]);
@@ -78,7 +78,7 @@ if (!empty($agents) && isset($_SESSION['user_id'])) {
     $agent_ids = array_column($agents, 'id');
     $placeholders = implode(',', array_fill(0, count($agent_ids), '?'));
     $sql_follow = "SELECT entity_id FROM user_follows WHERE user_id = ? AND entity_type = 'agent'";
-    $params_follow = [(int)$_SESSION['user_id']];
+    $params_follow = [(int) $_SESSION['user_id']];
     if ($placeholders) {
         $sql_follow .= " AND entity_id IN ($placeholders)";
         $params_follow = array_merge($params_follow, $agent_ids);
@@ -90,11 +90,11 @@ if (!empty($agents) && isset($_SESSION['user_id'])) {
 ?>
 
 
-  <!-- Content Wrapper. Contains page content -->
-  <div class="content-wrapper">
-	  <div class="container-full">
-		<!-- Main content -->
-		<section class="content">
+<!-- Content Wrapper. Contains page content -->
+<div class="content-wrapper">
+    <div class="container-full">
+        <!-- Main content -->
+        <section class="content">
             <div class="row mb-3">
                 <div class="col-12">
                     <div class="row">
@@ -125,7 +125,9 @@ if (!empty($agents) && isset($_SESSION['user_id'])) {
                         <div class="col-md-3 col-sm-6">
                             <div class="box bg-info-light">
                                 <div class="box-body">
-                                    <h4 class="mb-0"><?php echo $total_agents > 0 ? round(($active_agents / max($total_agents, 1)) * 100) : 0; ?>%</h4>
+                                    <h4 class="mb-0">
+                                        <?php echo $total_agents > 0 ? round(($active_agents / max($total_agents, 1)) * 100) : 0; ?>%
+                                    </h4>
                                     <span class="text-muted">Active %</span>
                                 </div>
                             </div>
@@ -134,30 +136,34 @@ if (!empty($agents) && isset($_SESSION['user_id'])) {
                 </div>
             </div>
             <?php if ($msg): ?>
-            <script>
-                document.addEventListener('DOMContentLoaded', function() {
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Success',
-                        text: <?php echo json_encode($msg); ?>,
-                        confirmButtonText: 'OK'
-                    }).then(function() {
-                        window.location.href = 'agentslist.php';
+                <script>
+                    document.addEventListener('DOMContentLoaded', function () {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Success',
+                            text: <?php echo json_encode($msg); ?>,
+                            confirmButtonText: 'OK'
+                        }).then(function () {
+                            window.location.href = 'agentslist.php';
+                        });
                     });
-                });
-            </script>
+                </script>
             <?php endif; ?>
             <div class="row mb-3">
                 <div class="col-md-7">
                     <form method="GET" action="agentslist.php" class="row g-2">
                         <div class="col-md-6">
-                            <input type="text" name="search" class="form-control" placeholder="Search by name, phone, email" value="<?php echo htmlspecialchars($search); ?>">
+                            <input type="text" name="search" class="form-control"
+                                placeholder="Search by name, phone, email"
+                                value="<?php echo htmlspecialchars($search); ?>">
                         </div>
                         <div class="col-md-4">
                             <select name="status" class="form-select">
                                 <option value="">All Status</option>
-                                <option value="Active" <?php echo $status_filter === 'Active' ? 'selected' : ''; ?>>Active</option>
-                                <option value="Inactive" <?php echo $status_filter === 'Inactive' ? 'selected' : ''; ?>>Inactive</option>
+                                <option value="Active" <?php echo $status_filter === 'Active' ? 'selected' : ''; ?>>Active
+                                </option>
+                                <option value="Inactive" <?php echo $status_filter === 'Inactive' ? 'selected' : ''; ?>>
+                                    Inactive</option>
                             </select>
                         </div>
                         <div class="col-md-2 d-flex">
@@ -170,55 +176,70 @@ if (!empty($agents) && isset($_SESSION['user_id'])) {
                     <a href="addagent.php" class="btn btn-success"><i class="ti-plus"></i> Add Agent</a>
                 </div>
             </div>
-			<div class="row">
+            <div class="row">
                 <?php if (!empty($agents)): ?>
                     <?php foreach ($agents as $agent): ?>
-				  <div class="col-12 col-lg-4">
-					<div class="box">
-					  <div class="box-header no-border p-0">				
-						<div class="position-relative">
-                          <?php
-                          $photo_src = '../images/avatar/375x200/4.jpg';
-                          if (!empty($agent['photo'])) {
-                              $photo_src = '../' . htmlspecialchars($agent['photo']);
-                          }
-                          ?>
-						  <img class="img-fluid" src="<?php echo $photo_src; ?>" alt="">
-                          <span class="badge badge-<?php echo ($agent['status'] ?? 'Active') === 'Active' ? 'success' : 'danger'; ?> position-absolute top-0 end-0 m-10">
-                              <?php echo htmlspecialchars($agent['status'] ?? 'Active'); ?>
-                          </span>
-						</div>
-					  </div>
-					  <div class="box-body">
-						  <div class="text-center">
-                            <div class="user-contact list-inline text-center">
-								<?php if (!empty($agent['facebook'])): ?>
-                                <a href="<?php echo htmlspecialchars($agent['facebook']); ?>" target="_blank" class="btn btn-circle mb-5 btn-facebook"><i class="fa fa-facebook"></i></a>
-                                <?php endif; ?>
-                                <?php if (!empty($agent['instagram'])): ?>
-								<a href="<?php echo htmlspecialchars($agent['instagram']); ?>" target="_blank" class="btn btn-circle mb-5 btn-instagram"><i class="fa fa-instagram"></i></a>
-                                <?php endif; ?>
-                                <?php if (!empty($agent['twitter'])): ?>
-								<a href="<?php echo htmlspecialchars($agent['twitter']); ?>" target="_blank" class="btn btn-circle mb-5 btn-twitter"><i class="fa-brands fa-x-twitter"></i></a>
-                                <?php endif; ?>
-                                <?php if (!empty($agent['email'])): ?>
-								<a href="mailto:<?php echo htmlspecialchars($agent['email']); ?>" class="btn btn-circle mb-5 btn-warning"><i class="fa fa-envelope"></i></a>
-                                <?php endif; ?>
-							</div>
-							<h3 class="my-10">
-                                <a href="agentprofile.php?id=<?php echo (int)$agent['id']; ?>">
-                                    <?php echo htmlspecialchars(trim(($agent['first_name'] ?? '') . ' ' . ($agent['last_name'] ?? '')) ?: 'Agent'); ?>
-                                </a>
-                            </h3>
-							<h6 class="user-info mt-0 mb-10">
-                                <i class="fa fa-phone me-5"></i><?php echo htmlspecialchars($agent['phone'] ?? ''); ?>
-                            </h6>
-							<p class="w-p85 mx-auto">
-                                <i class="fa fa-envelope me-5"></i> <?php echo htmlspecialchars($agent['email'] ?? ''); ?>
-                            </p>
-                            <div class="mt-10">
-                                <form method="POST" action="agentslist.php" class="d-inline">
-                                    <input type="hidden" name="follow_agent_id" value="<?php echo (int)$agent['id']; ?>">
+                        <div class="col-12 col-lg-4">
+                            <div class="box">
+                                <div class="box-header no-border p-0">
+                                    <div class="position-relative">
+                                        <?php
+                                        $photo_src = '../images/avatar/375x200/4.jpg';
+                                        if (!empty($agent['photo'])) {
+                                            $photo_src = '../' . htmlspecialchars($agent['photo']);
+                                        }
+                                        ?>
+                                        <img class="img-fluid" src="<?php echo $photo_src; ?>" alt="">
+                                        <span
+                                            class="badge badge-<?php echo ($agent['status'] ?? 'Active') === 'Active' ? 'success' : 'danger'; ?> position-absolute top-0 end-0 m-10">
+                                            <?php echo htmlspecialchars($agent['status'] ?? 'Active'); ?>
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="box-body">
+                                    <div class="text-center">
+                                        <div class="user-contact list-inline text-center">
+                                            <?php if (!empty($agent['facebook'])): ?>
+                                                <a href="<?php echo htmlspecialchars($agent['facebook']); ?>" target="_blank"
+                                                    class="btn btn-circle mb-5 btn-facebook"><i class="fa fa-facebook"></i></a>
+                                            <?php endif; ?>
+                                            <?php if (!empty($agent['instagram'])): ?>
+                                                <a href="<?php echo htmlspecialchars($agent['instagram']); ?>" target="_blank"
+                                                    class="btn btn-circle mb-5 btn-instagram"><i class="fa fa-instagram"></i></a>
+                                            <?php endif; ?>
+                                            <?php if (!empty($agent['twitter'])): ?>
+                                                <a href="<?php echo htmlspecialchars($agent['twitter']); ?>" target="_blank"
+                                                    class="btn btn-circle mb-5 btn-twitter"><i
+                                                        class="fa-brands fa-x-twitter"></i></a>
+                                            <?php endif; ?>
+                                            <?php if (!empty($agent['email'])): ?>
+                                                <a href="https://mail.google.com/mail/?view=cm&fs=1&to=<?php echo htmlspecialchars($agent['email']); ?>"
+                                                    class="btn btn-circle mb-5 btn-warning" target="_blank"><i
+                                                        class="fa fa-envelope"></i></a>
+                                            <?php endif; ?>
+                                        </div>
+                                        <h3 class="my-10">
+                                            <a href="agentprofile.php?id=<?php echo (int) $agent['id']; ?>">
+                                                <?php echo htmlspecialchars(trim(($agent['first_name'] ?? '') . ' ' . ($agent['last_name'] ?? '')) ?: 'Agent'); ?>
+                                            </a>
+                                        </h3>
+                                        <h6 class="user-info mt-0 mb-10">
+                                            <a href="tel:<?php echo htmlspecialchars($agent['phone'] ?? ''); ?>"
+                                                class="text-decoration-none" target="_blank">
+                                                <i
+                                                    class="fa fa-phone me-5"></i><?php echo htmlspecialchars($agent['phone'] ?? ''); ?>
+                                            </a>
+                                        </h6>
+                                        <p class="w-p85 mx-auto">
+                                            <a href="https://mail.google.com/mail/?view=cm&fs=1&to=<?php echo htmlspecialchars($agent['email'] ?? ''); ?>"
+                                                class="text-decoration-none" target="_blank">
+                                                <i class="fa fa-envelope me-5"></i>
+                                                <?php echo htmlspecialchars($agent['email'] ?? ''); ?>
+                                            </a>
+                                        </p>
+                                        <div class="mt-10">
+                                            <!-- <form method="POST" action="agentslist.php" class="d-inline">
+                                    <input type="hidden" name="follow_agent_id" value="<?php echo (int) $agent['id']; ?>">
                                     <?php
                                     $is_followed = in_array($agent['id'], $followed_agents);
                                     $follow_class = $is_followed ? 'btn-success' : 'btn-outline-success';
@@ -227,14 +248,17 @@ if (!empty($agents) && isset($_SESSION['user_id'])) {
                                     <button type="submit" class="btn btn-sm <?php echo $follow_class; ?> me-2" title="<?php echo $follow_title; ?>">
                                         <i class="ti-heart"></i>
                                     </button>
-                                </form>
-                                <a href="addagent.php?id=<?php echo (int)$agent['id']; ?>" class="btn btn-sm btn-info me-2"><i class="ti-pencil"></i> Edit</a>
-                                <a href="#" class="btn btn-sm btn-danger" onclick="return confirmDeleteAgent(<?php echo (int)$agent['id']; ?>);"><i class="ti-trash"></i> Delete</a>
+                                </form> -->
+                                            <a href="addagent.php?id=<?php echo (int) $agent['id']; ?>"
+                                                class="btn btn-sm btn-info me-2"><i class="ti-pencil"></i> Edit</a>
+                                            <a href="#" class="btn btn-sm btn-danger"
+                                                onclick="return confirmDeleteAgent(<?php echo (int) $agent['id']; ?>);"><i
+                                                    class="ti-trash"></i> Delete</a>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-						  </div>
-					  </div>
-					</div>
-				  </div>
+                        </div>
                     <?php endforeach; ?>
                 <?php else: ?>
                     <div class="col-12">
@@ -246,13 +270,13 @@ if (!empty($agents) && isset($_SESSION['user_id'])) {
                         </div>
                     </div>
                 <?php endif; ?>
-			</div>
-		</section>
-		<!-- /.content -->
-	  </div>
-  </div>
-  <!-- /.content-wrapper -->
-  <script>
+            </div>
+        </section>
+        <!-- /.content -->
+    </div>
+</div>
+<!-- /.content-wrapper -->
+<script>
     function confirmDeleteAgent(id) {
         if (!id) return false;
         Swal.fire({
@@ -276,8 +300,8 @@ if (!empty($agents) && isset($_SESSION['user_id'])) {
         });
         return false;
     }
-  </script>
-  <?php
-  $hide_dashboard_js = true;
-  include 'includes/footer.php';
-  ?>
+</script>
+<?php
+$hide_dashboard_js = true;
+include 'includes/footer.php';
+?>

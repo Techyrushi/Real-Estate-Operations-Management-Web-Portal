@@ -9,6 +9,40 @@ if (!hasRole('Admin') && !hasPermission('manage_users')) {
     exit();
 }
 
+$msg = "";
+$error = "";
+
+if (isset($_GET['action'], $_GET['id']) && $_GET['action'] === 'delete') {
+    $delete_id = (int)$_GET['id'];
+    if ($delete_id === (int)($_SESSION['user_id'] ?? 0)) {
+        $error = "You cannot delete your own account.";
+    } else {
+        $stmt = $pdo->prepare("SELECT username, role_id FROM users WHERE id = :id");
+        $stmt->execute(['id' => $delete_id]);
+        $userRow = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$userRow) {
+            $error = "User not found.";
+        } else {
+            $isAdminRole = false;
+            if (!empty($userRow['role_id'])) {
+                $stmtRole = $pdo->prepare("SELECT name FROM roles WHERE id = :id");
+                $stmtRole->execute(['id' => $userRow['role_id']]);
+                $roleRow = $stmtRole->fetch(PDO::FETCH_ASSOC);
+                if ($roleRow && strtolower($roleRow['name']) === 'admin') {
+                    $isAdminRole = true;
+                }
+            }
+            if ($isAdminRole) {
+                $error = "Admin user cannot be deleted.";
+            } else {
+                $stmtDel = $pdo->prepare("DELETE FROM users WHERE id = :id");
+                $stmtDel->execute(['id' => $delete_id]);
+                $msg = "User deleted successfully.";
+            }
+        }
+    }
+}
+
 // Fetch all users with roles
 $stmt = $pdo->query("
     SELECT u.*, r.name as role_name 
@@ -45,6 +79,12 @@ $users = $stmt->fetchAll();
             <div class="col-12">
                 <div class="box">
                     <div class="box-body">
+                        <?php if ($msg): ?>
+                            <div class="alert alert-success"><?php echo $msg; ?></div>
+                        <?php endif; ?>
+                        <?php if ($error): ?>
+                            <div class="alert alert-danger"><?php echo $error; ?></div>
+                        <?php endif; ?>
                         <div class="table-responsive">
                             <table class="table table-hover mb-0">
                                 <thead>
@@ -75,7 +115,13 @@ $users = $stmt->fetchAll();
                                         <td><?php echo date('d M Y', strtotime($user['created_at'])); ?></td>
                                         <td>
                                             <a href="admin_user_edit.php?id=<?php echo $user['id']; ?>" class="text-info me-2" data-bs-toggle="tooltip" title="Edit"><i class="ti-pencil"></i></a>
-                                            <!-- Add delete functionality if needed -->
+                                            <?php
+                                            $isSelf = ($user['id'] == ($_SESSION['user_id'] ?? 0));
+                                            $isAdminRole = strtolower($user['role_name'] ?? '') === 'admin';
+                                            if (!$isSelf && !$isAdminRole):
+                                            ?>
+                                                <a href="admin_users.php?action=delete&id=<?php echo $user['id']; ?>" class="text-danger" data-bs-toggle="tooltip" title="Delete" onclick="return confirm('Delete this user?');"><i class="ti-trash"></i></a>
+                                            <?php endif; ?>
                                         </td>
                                     </tr>
                                     <?php endforeach; ?>

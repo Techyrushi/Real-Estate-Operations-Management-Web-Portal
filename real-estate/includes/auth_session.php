@@ -17,20 +17,20 @@ if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity']) >
 }
 $_SESSION['last_activity'] = time();
 
-function hasPermission($slug) {
-    if (!isset($_SESSION['permissions'])) {
-        return false;
-    }
-    // Admin has all permissions usually, but let's rely on the DB assignment
-    // or we can hardcode Admin bypass:
-    // if (hasRole('Admin')) return true; 
-    return in_array($slug, $_SESSION['permissions']);
-}
-
 function hasRole($roleName) {
     if (!isset($_SESSION['role_name'])) {
         return false;
     }
     return strtolower($_SESSION['role_name']) === strtolower($roleName);
+}
+
+function hasPermission($slug) {
+    if (hasRole('Admin')) {
+        return true;
+    }
+    if (!isset($_SESSION['permissions'])) {
+        return false;
+    }
+    return in_array($slug, $_SESSION['permissions']);
 }
 ?>

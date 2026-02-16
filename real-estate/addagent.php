@@ -137,23 +137,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	<div class="container-full">
 		<!-- Main content -->
 		<section class="content">
-            <?php if ($success_msg): ?>
-            <script>
-                document.addEventListener('DOMContentLoaded', function() {
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Success',
-                        text: <?php echo json_encode($success_msg); ?>,
-                        confirmButtonText: 'OK'
-                    }).then(function() {
-                        window.location.href = 'agentslist.php';
-                    });
-                });
-            </script>
-            <?php endif; ?>
+			<?php if ($success_msg): ?>
+				<script>
+					document.addEventListener('DOMContentLoaded', function () {
+						Swal.fire({
+							icon: 'success',
+							title: 'Success',
+							text: <?php echo json_encode($success_msg); ?>,
+							confirmButtonText: 'OK'
+						}).then(function () {
+							window.location.href = 'agentslist.php';
+						});
+					});
+				</script>
+			<?php endif; ?>
 			<?php if ($error): ?>
-            <div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div>
-            <?php endif; ?>
+				<div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div>
+			<?php endif; ?>
 			<form method="POST" enctype="multipart/form-data"
 				action="addagent.php<?php echo $id ? '?id=' . (int) $id : ''; ?>"
 				onsubmit="Swal.fire({title: 'Processing...', text: 'Please wait...', allowOutsideClick: false, didOpen: () => { Swal.showLoading() }});">
@@ -201,20 +201,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 									</div>
 								</div>
 								<div class="row">
-									<div class="col-sm-3">
+									<div class="col-sm-4">
 										<div class="form-group">
 											<input type="date" class="form-control" name="dob"
 												placeholder="Date of Birth"
 												value="<?php echo htmlspecialchars($agent['dob']); ?>">
 										</div>
 									</div>
-									<div class="col-sm-3">
+									<div class="col-sm-4">
 										<div class="form-group">
 											<input type="number" class="form-control" name="age" placeholder="Age"
 												value="<?php echo htmlspecialchars($agent['age']); ?>">
 										</div>
 									</div>
-									<div class="col-sm-3">
+									<div class="col-sm-4">
 										<div class="form-group">
 											<select class="form-select select2" name="gender">
 												<option value="">Select Gender</option>
@@ -224,16 +224,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 											</select>
 										</div>
 									</div>
-									<div class="col-sm-3">
+								</div>
+								<div class="row">
+									<div class="col-sm-4">
 										<div class="form-group">
 											<input type="email" class="form-control" name="email"
 												placeholder="Enter Your Email"
 												value="<?php echo htmlspecialchars($agent['email']); ?>">
 										</div>
 									</div>
-								</div>
-								<div class="row">
-									<div class="col-sm-3">
+
+									<div class="col-sm-4">
 										<div class="form-group">
 											<select class="form-select" name="status">
 												<option value="Active" <?php echo $agent['status'] === 'Active' ? 'selected' : ''; ?>>Active</option>
@@ -241,7 +242,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 											</select>
 										</div>
 									</div>
-								
+
 									<div class="col-sm-4">
 										<div class="form-group">
 											<?php if (!empty($agent['photo'])): ?>
@@ -253,80 +254,81 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 											<input type="file" class="form-control" name="photo" accept="image/*">
 										</div>
 									</div>
-									<div class="col-12 mt-10">
-										<div class="form-group mb-0">
-											<textarea rows="4" class="form-control no-resize" name="description"
-												placeholder="Description"><?php echo htmlspecialchars($agent['description']); ?></textarea>
-										</div>
+								</div>
+								<div class="col-12 mt-10">
+									<div class="form-group mb-0">
+										<textarea rows="4" class="form-control no-resize" name="description"
+											placeholder="Description"><?php echo htmlspecialchars($agent['description']); ?></textarea>
 									</div>
 								</div>
-							</div>
-
-							<div class="col-lg-12 col-12">
-								<div class="box">
-									<div class="box-header">
-										<h4 class="box-title">Social Information</h4>
-										<ul class="box-controls pull-right">
-											<li class="dropdown">
-												<a data-bs-toggle="dropdown" href="#" class="px-10 hover-primary"><i
-														class="ti-menu hover-primary"></i></a>
-												<div class="dropdown-menu">
-													<a class="dropdown-item" href="#"><i class="ti-import"></i>
-														Import</a>
-													<a class="dropdown-item" href="#"><i class="ti-export"></i>
-														Export</a>
-													<a class="dropdown-item" href="#"><i class="ti-printer"></i>
-														Print</a>
-													<div class="dropdown-divider"></div>
-													<a class="dropdown-item" href="#"><i class="ti-settings"></i>
-														Settings</a>
-												</div>
-											</li>
-										</ul>
-									</div>
-									<div class="box-body">
-										<div class="row">
-											<div class="col-sm-6">
-												<div class="form-group">
-													<input type="text" class="form-control" name="facebook"
-														placeholder="Facebook"
-														value="<?php echo htmlspecialchars($agent['facebook']); ?>">
-												</div>
-											</div>
-											<div class="col-sm-6">
-												<div class="form-group">
-													<input type="text" class="form-control" name="twitter"
-														placeholder="Twitter"
-														value="<?php echo htmlspecialchars($agent['twitter']); ?>">
-												</div>
-											</div>
-											<div class="col-sm-6">
-												<div class="form-group mb-md-0">
-													<input type="text" class="form-control" name="instagram"
-														placeholder="Instagram"
-														value="<?php echo htmlspecialchars($agent['instagram']); ?>">
-												</div>
-											</div>
-										</div>
-									</div>
-								</div>
-							</div>
-							<div class="box-footer">
-								<a href="agentslist.php" class="btn btn-danger mr-1 waves-effect waves-light">
-									<i class="ti-trash"></i> Cancel
-								</a>
-								<button type="submit" class="btn btn-primary waves-effect waves-light">
-									<i class="ti-save-alt"></i> Submit
-								</button>
 							</div>
 						</div>
-					</div>
 
+						<div class="col-lg-12 col-12">
+							<div class="box">
+								<div class="box-header">
+									<h4 class="box-title">Social Information</h4>
+									<ul class="box-controls pull-right">
+										<li class="dropdown">
+											<a data-bs-toggle="dropdown" href="#" class="px-10 hover-primary"><i
+													class="ti-menu hover-primary"></i></a>
+											<div class="dropdown-menu">
+												<a class="dropdown-item" href="#"><i class="ti-import"></i>
+													Import</a>
+												<a class="dropdown-item" href="#"><i class="ti-export"></i>
+													Export</a>
+												<a class="dropdown-item" href="#"><i class="ti-printer"></i>
+													Print</a>
+												<div class="dropdown-divider"></div>
+												<a class="dropdown-item" href="#"><i class="ti-settings"></i>
+													Settings</a>
+											</div>
+										</li>
+									</ul>
+								</div>
+								<div class="box-body">
+									<div class="row">
+										<div class="col-sm-6">
+											<div class="form-group">
+												<input type="text" class="form-control" name="facebook"
+													placeholder="Facebook"
+													value="<?php echo htmlspecialchars($agent['facebook']); ?>">
+											</div>
+										</div>
+										<div class="col-sm-6">
+											<div class="form-group">
+												<input type="text" class="form-control" name="twitter"
+													placeholder="Twitter"
+													value="<?php echo htmlspecialchars($agent['twitter']); ?>">
+											</div>
+										</div>
+										<div class="col-sm-6">
+											<div class="form-group mb-md-0">
+												<input type="text" class="form-control" name="instagram"
+													placeholder="Instagram"
+													value="<?php echo htmlspecialchars($agent['instagram']); ?>">
+											</div>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="box-footer">
+							<a href="agentslist.php" class="btn btn-danger mr-1 waves-effect waves-light">
+								<i class="ti-trash"></i> Cancel
+							</a>
+							<button type="submit" class="btn btn-primary waves-effect waves-light">
+								<i class="ti-save-alt"></i> Submit
+							</button>
+						</div>
+					</div>
 				</div>
-			</form>
-		</section>
-		<!-- /.content -->
+
 	</div>
+	</form>
+	</section>
+	<!-- /.content -->
+</div>
 </div>
 <!-- /.content-wrapper -->
 <?php
