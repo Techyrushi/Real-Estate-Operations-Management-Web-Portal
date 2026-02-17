@@ -87,7 +87,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 						<div class="bg-white rounded10 shadow-lg">
 							<div class="content-top-agile p-20 pb-0">
 								<h2 class="text-primary">Let's Get Started</h2>
-								<p class="mb-0">Sign in to continue to WebkitX.</p>							
+								<p class="mb-0">Sign in to continue to Real Estate Management System.</p>								
 							</div>
 							<div class="p-40">
 								<form action="" method="post">

@@ -9,18 +9,18 @@ if (!hasRole('Admin') && !hasPermission('view_reports')) {
 }
 
 // Tab Selection
-$tab = $_GET['tab'] ?? 'financial';
+$tab = isset($_GET['tab']) ? $_GET['tab'] : 'financial';
 
 // Global Filters
-$from_date = $_GET['from_date'] ?? '';
-$to_date = $_GET['to_date'] ?? '';
-$project_filter = $_GET['project_id'] ?? '';
-$vendor_filter = $_GET['vendor_id'] ?? '';
+$from_date = isset($_GET['from_date']) ? $_GET['from_date'] : '';
+$to_date = isset($_GET['to_date']) ? $_GET['to_date'] : '';
+$project_filter = isset($_GET['project_id']) ? $_GET['project_id'] : '';
+$vendor_filter = isset($_GET['vendor_id']) ? $_GET['vendor_id'] : '';
 
 $project_options = $pdo->query("SELECT id, name FROM projects ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
 $vendor_options = $pdo->query("SELECT id, name FROM vendors ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
 
-$filter_params = [];
+$filter_params = array();
 if ($from_date !== '') {
     $filter_params['from_date'] = $from_date;
 }
@@ -34,18 +34,18 @@ if ($vendor_filter !== '') {
     $filter_params['vendor_id'] = $vendor_filter;
 }
 
-$tab_urls = [
-    'financial' => 'admin_reports.php?' . http_build_query(array_merge($filter_params, ['tab' => 'financial'])),
-    'partners' => 'admin_reports.php?' . http_build_query(array_merge($filter_params, ['tab' => 'partners'])),
-    'outstanding' => 'admin_reports.php?' . http_build_query(array_merge($filter_params, ['tab' => 'outstanding'])),
-    'aging' => 'admin_reports.php?' . http_build_query(array_merge($filter_params, ['tab' => 'aging'])),
-    'expenses' => 'admin_reports.php?' . http_build_query(array_merge($filter_params, ['tab' => 'expenses'])),
-    'vendor90' => 'admin_reports.php?' . http_build_query(array_merge($filter_params, ['tab' => 'vendor90'])),
-    'cashflow' => 'admin_reports.php?' . http_build_query(array_merge($filter_params, ['tab' => 'cashflow'])),
-];
+$tab_urls = array(
+    'financial' => 'admin_reports.php?' . http_build_query(array_merge($filter_params, array('tab' => 'financial'))),
+    'partners' => 'admin_reports.php?' . http_build_query(array_merge($filter_params, array('tab' => 'partners'))),
+    'outstanding' => 'admin_reports.php?' . http_build_query(array_merge($filter_params, array('tab' => 'outstanding'))),
+    'aging' => 'admin_reports.php?' . http_build_query(array_merge($filter_params, array('tab' => 'aging'))),
+    'expenses' => 'admin_reports.php?' . http_build_query(array_merge($filter_params, array('tab' => 'expenses'))),
+    'vendor90' => 'admin_reports.php?' . http_build_query(array_merge($filter_params, array('tab' => 'vendor90'))),
+    'cashflow' => 'admin_reports.php?' . http_build_query(array_merge($filter_params, array('tab' => 'cashflow'))),
+);
 
 // 1. Financial Summary Data
-$financials = [];
+$financials = array();
 if ($tab == 'financial') {
     $projects = $project_options;
     foreach ($projects as $p) {
@@ -113,32 +113,37 @@ if ($tab == 'financial') {
 }
 
 // 2. Partner Capital Data
-$partners_data = [];
+$partners_data = array();
 if ($tab == 'partners') {
-    $partners = $pdo->query("SELECT * FROM partners")->fetchAll();
-    foreach ($partners as $p) {
-        $credits = $pdo->prepare("SELECT SUM(amount) FROM partner_ledger WHERE partner_id = ? AND type = 'Credit'");
-        $credits->execute([$p['id']]);
-        $total_credit = $credits->fetchColumn() ?: 0;
+    try {
+        $partners_stmt = $pdo->query("SELECT * FROM partners");
+        $partners = $partners_stmt ? $partners_stmt->fetchAll() : array();
+        foreach ($partners as $p) {
+            $credits = $pdo->prepare("SELECT SUM(amount) FROM partner_ledger WHERE partner_id = ? AND type = 'Credit'");
+            $credits->execute([$p['id']]);
+            $total_credit = $credits->fetchColumn() ?: 0;
 
-        $debits = $pdo->prepare("SELECT SUM(amount) FROM partner_ledger WHERE partner_id = ? AND type = 'Debit'");
-        $debits->execute([$p['id']]);
-        $total_debit = $debits->fetchColumn() ?: 0;
+            $debits = $pdo->prepare("SELECT SUM(amount) FROM partner_ledger WHERE partner_id = ? AND type = 'Debit'");
+            $debits->execute([$p['id']]);
+            $total_debit = $debits->fetchColumn() ?: 0;
 
-        $current_capital = $p['opening_capital'] + $total_credit - $total_debit;
-        
-        $partners_data[] = [
-            'name' => $p['name'],
-            'opening' => $p['opening_capital'],
-            'invested' => $total_credit,
-            'withdrawn' => $total_debit,
-            'current' => $current_capital
-        ];
+            $current_capital = $p['opening_capital'] + $total_credit - $total_debit;
+            
+            $partners_data[] = [
+                'name' => $p['name'],
+                'opening' => $p['opening_capital'],
+                'invested' => $total_credit,
+                'withdrawn' => $total_debit,
+                'current' => $current_capital
+            ];
+        }
+    } catch (PDOException $e) {
+        $partners_data = array();
     }
 }
 
 // 3. Outstanding Data
-$outstanding_data = [];
+$outstanding_data = array();
 if ($tab == 'outstanding') {
     $sql = "SELECT c.id as customer_id, c.name, p.id as project_id, p.name as project_name, b.total_price as deal_value, b.id as booking_id, b.booking_date 
             FROM customers c 
@@ -147,7 +152,7 @@ if ($tab == 'outstanding') {
             JOIN projects p ON u.project_id = p.id 
             WHERE b.status != 'Cancelled'";
 
-    $params = [];
+    $params = array();
     if ($project_filter !== '') {
         $sql .= " AND p.id = ?";
         $params[] = $project_filter;
@@ -184,11 +189,16 @@ if ($tab == 'outstanding') {
         }
     }
     // Sort by Balance DESC
-    usort($outstanding_data, function($a, $b) { return $b['balance'] <=> $a['balance']; });
+    usort($outstanding_data, function($a, $b) { 
+        if ($b['balance'] == $a['balance']) {
+            return 0;
+        }
+        return ($b['balance'] > $a['balance']) ? 1 : -1;
+    });
 }
 
 // Aging Data
-$aging_data = [];
+$aging_data = array();
 if ($tab == 'aging') {
     $sql = "SELECT c.id as customer_id, c.name, p.id as project_id, p.name as project_name, b.total_price as deal_value, b.id as booking_id, b.booking_date 
             FROM customers c 
@@ -197,7 +207,7 @@ if ($tab == 'aging') {
             JOIN projects p ON u.project_id = p.id 
             WHERE b.status != 'Cancelled'";
 
-    $params = [];
+    $params = array();
     if ($project_filter !== '') {
         $sql .= " AND p.id = ?";
         $params[] = $project_filter;
@@ -252,7 +262,7 @@ if ($tab == 'aging') {
 }
 
 // Expense Ledger
-$expenses_data = [];
+$expenses_data = array();
 if ($tab == 'expenses') {
     $sql = "SELECT e.*, 
                    p.name as project_name, 
@@ -266,7 +276,7 @@ if ($tab == 'expenses') {
             LEFT JOIN banks b ON e.bank_id = b.id
             WHERE 1=1";
 
-    $params = [];
+    $params = array();
     if ($project_filter !== '') {
         $sql .= " AND e.project_id = ?";
         $params[] = $project_filter;
@@ -292,7 +302,7 @@ if ($tab == 'expenses') {
 }
 
 // Vendor 90-day Activity
-$vendor_activity = [];
+$vendor_activity = array();
 if ($tab == 'vendor90') {
     $window_start = date('Y-m-d', strtotime('-90 days'));
     $sql = "SELECT v.id, v.name,
@@ -319,7 +329,7 @@ if ($tab == 'vendor90') {
 }
 
 // 4. Cash Flow Data
-$cashflow_data = [];
+$cashflow_data = array();
 if ($tab == 'cashflow') {
     $sql = "SELECT 'Sales' as category, p.payment_date as date, 
                    CONCAT('Payment from ', c.name, ' (Unit ', IFNULL(u.flat_no, ''), ')') as description,
@@ -347,8 +357,12 @@ if ($tab == 'cashflow') {
             JOIN partners ptr ON pl.partner_id = ptr.id
 
             ORDER BY date DESC";
-            
-    $cashflow_data = $pdo->query($sql)->fetchAll();
+    try {
+        $cashflow_stmt = $pdo->query($sql);
+        $cashflow_data = $cashflow_stmt ? $cashflow_stmt->fetchAll() : array();
+    } catch (PDOException $e) {
+        $cashflow_data = array();
+    }
 }
 
 $financial_summary = [
@@ -417,8 +431,8 @@ $expenses_summary = [
 if (!empty($expenses_data)) {
     $expenses_summary['count'] = count($expenses_data);
     foreach ($expenses_data as $row) {
-        $amount = (float)($row['amount'] ?? 0);
-        $gst = (float)($row['gst_amount'] ?? 0);
+        $amount = (float)(isset($row['amount']) ? $row['amount'] : 0);
+        $gst = (float)(isset($row['gst_amount']) ? $row['gst_amount'] : 0);
         $expenses_summary['total_amount'] += $amount;
         $expenses_summary['total_gst'] += $gst;
         $expenses_summary['total_total'] += $amount + $gst;
@@ -492,18 +506,18 @@ if (isset($_GET['export'])) {
         echo "<table border='1'>";
         echo "<tr><th>Date</th><th>Project</th><th>Vendor</th><th>Material</th><th>Amount</th><th>GST</th><th>Total</th><th>Mode</th><th>Reference</th><th>Remarks</th></tr>";
         foreach ($expenses_data as $row) {
-            $total = ($row['amount'] ?? 0) + ($row['gst_amount'] ?? 0);
+            $total = (isset($row['amount']) ? $row['amount'] : 0) + (isset($row['gst_amount']) ? $row['gst_amount'] : 0);
             echo "<tr>";
             echo "<td>" . htmlspecialchars($row['expense_date']) . "</td>";
-            echo "<td>" . htmlspecialchars($row['project_name'] ?? '') . "</td>";
-            echo "<td>" . htmlspecialchars($row['vendor_name'] ?? '') . "</td>";
-            echo "<td>" . htmlspecialchars($row['material_name'] ?? '') . "</td>";
+            echo "<td>" . htmlspecialchars(isset($row['project_name']) ? $row['project_name'] : '') . "</td>";
+            echo "<td>" . htmlspecialchars(isset($row['vendor_name']) ? $row['vendor_name'] : '') . "</td>";
+            echo "<td>" . htmlspecialchars(isset($row['material_name']) ? $row['material_name'] : '') . "</td>";
             echo "<td>" . number_format($row['amount'], 2) . "</td>";
             echo "<td>" . number_format($row['gst_amount'], 2) . "</td>";
             echo "<td>" . number_format($total, 2) . "</td>";
-            echo "<td>" . htmlspecialchars($row['payment_mode'] ?? '') . "</td>";
-            echo "<td>" . htmlspecialchars($row['reference_no'] ?? '') . "</td>";
-            echo "<td>" . htmlspecialchars($row['remarks'] ?? '') . "</td>";
+            echo "<td>" . htmlspecialchars(isset($row['payment_mode']) ? $row['payment_mode'] : '') . "</td>";
+            echo "<td>" . htmlspecialchars(isset($row['reference_no']) ? $row['reference_no'] : '') . "</td>";
+            echo "<td>" . htmlspecialchars(isset($row['remarks']) ? $row['remarks'] : '') . "</td>";
             echo "</tr>";
         }
         echo "</table>";
@@ -822,25 +836,25 @@ $export_vendor90_query = http_build_query(array_merge($filter_params, ['tab' => 
                                 <div class="col-md-3 col-6 mb-2">
                                     <div class="p-2 bg-light rounded">
                                         <div class="text-muted small">0-30 Days</div>
-                                        <div class="h6 mb-0 text-danger">₹ <?php echo number_format($aging_buckets_summary['0-30'] ?? 0, 2); ?></div>
+                                        <div class="h6 mb-0 text-danger">₹ <?php echo number_format(isset($aging_buckets_summary['0-30']) ? $aging_buckets_summary['0-30'] : 0, 2); ?></div>
                                     </div>
                                 </div>
                                 <div class="col-md-3 col-6 mb-2">
                                     <div class="p-2 bg-light rounded">
                                         <div class="text-muted small">31-60 Days</div>
-                                        <div class="h6 mb-0 text-danger">₹ <?php echo number_format($aging_buckets_summary['31-60'] ?? 0, 2); ?></div>
+                                        <div class="h6 mb-0 text-danger">₹ <?php echo number_format(isset($aging_buckets_summary['31-60']) ? $aging_buckets_summary['31-60'] : 0, 2); ?></div>
                                     </div>
                                 </div>
                                 <div class="col-md-3 col-6 mb-2">
                                     <div class="p-2 bg-light rounded">
                                         <div class="text-muted small">61-90 Days</div>
-                                        <div class="h6 mb-0 text-danger">₹ <?php echo number_format($aging_buckets_summary['61-90'] ?? 0, 2); ?></div>
+                                        <div class="h6 mb-0 text-danger">₹ <?php echo number_format(isset($aging_buckets_summary['61-90']) ? $aging_buckets_summary['61-90'] : 0, 2); ?></div>
                                     </div>
                                 </div>
                                 <div class="col-md-3 col-6 mb-2">
                                     <div class="p-2 bg-light rounded">
                                         <div class="text-muted small">90+ Days</div>
-                                        <div class="h6 mb-0 text-danger">₹ <?php echo number_format($aging_buckets_summary['90+'] ?? 0, 2); ?></div>
+                                        <div class="h6 mb-0 text-danger">₹ <?php echo number_format(isset($aging_buckets_summary['90+']) ? $aging_buckets_summary['90+'] : 0, 2); ?></div>
                                     </div>
                                 </div>
                             </div>
@@ -940,20 +954,20 @@ $export_vendor90_query = http_build_query(array_merge($filter_params, ['tab' => 
                                         <?php if (!empty($expenses_data)): foreach ($expenses_data as $row): ?>
                                         <tr>
                                             <td><?php echo htmlspecialchars($row['expense_date']); ?></td>
-                                            <td><?php echo htmlspecialchars($row['project_name'] ?? ''); ?></td>
-                                            <td><?php echo htmlspecialchars($row['vendor_name'] ?? ''); ?></td>
-                                            <td><?php echo htmlspecialchars($row['material_name'] ?? ''); ?></td>
+                                            <td><?php echo htmlspecialchars(isset($row['project_name']) ? $row['project_name'] : ''); ?></td>
+                                            <td><?php echo htmlspecialchars(isset($row['vendor_name']) ? $row['vendor_name'] : ''); ?></td>
+                                            <td><?php echo htmlspecialchars(isset($row['material_name']) ? $row['material_name'] : ''); ?></td>
                                             <td class="text-end">₹ <?php echo number_format($row['amount'], 2); ?></td>
                                             <td class="text-end">₹ <?php echo number_format($row['gst_amount'], 2); ?></td>
                                             <td class="text-end">
                                                 <?php 
-                                                $total = ($row['amount'] ?? 0) + ($row['gst_amount'] ?? 0);
+                                                $total = (isset($row['amount']) ? $row['amount'] : 0) + (isset($row['gst_amount']) ? $row['gst_amount'] : 0);
                                                 echo '₹ ' . number_format($total, 2);
                                                 ?>
                                             </td>
-                                            <td><?php echo htmlspecialchars($row['payment_mode'] ?? ''); ?></td>
-                                            <td><?php echo htmlspecialchars($row['reference_no'] ?? ''); ?></td>
-                                            <td><?php echo htmlspecialchars($row['remarks'] ?? ''); ?></td>
+                                            <td><?php echo htmlspecialchars(isset($row['payment_mode']) ? $row['payment_mode'] : ''); ?></td>
+                                            <td><?php echo htmlspecialchars(isset($row['reference_no']) ? $row['reference_no'] : ''); ?></td>
+                                            <td><?php echo htmlspecialchars(isset($row['remarks']) ? $row['remarks'] : ''); ?></td>
                                         </tr>
                                         <?php endforeach; else: ?>
                                             <tr><td colspan="10" class="text-center">No expense data available.</td></tr>
@@ -1082,14 +1096,17 @@ $export_vendor90_query = http_build_query(array_merge($filter_params, ['tab' => 
                                         <tr>
                                             <td><?php echo date('d-M-Y', strtotime($row['date'])); ?></td>
                                             <td>
-                                                <span class="badge <?php 
-                                                    echo match($row['category']) {
-                                                        'Sales' => 'badge-success',
-                                                        'Expense' => 'badge-danger',
-                                                        'Partner Capital' => 'badge-info',
-                                                        default => 'badge-secondary'
-                                                    };
-                                                ?>"><?php echo $row['category']; ?></span>
+                                                <?php
+                                                $categoryClass = 'badge-secondary';
+                                                if ($row['category'] === 'Sales') {
+                                                    $categoryClass = 'badge-success';
+                                                } elseif ($row['category'] === 'Expense') {
+                                                    $categoryClass = 'badge-danger';
+                                                } elseif ($row['category'] === 'Partner Capital') {
+                                                    $categoryClass = 'badge-info';
+                                                }
+                                                ?>
+                                                <span class="badge <?php echo $categoryClass; ?>"><?php echo $row['category']; ?></span>
                                             </td>
                                             <td><?php echo htmlspecialchars($row['description']); ?></td>
                                             <td><?php echo htmlspecialchars($row['mode']); ?></td>
@@ -1131,10 +1148,10 @@ $financial_received_json = '[]';
 $financial_expenses_json = '[]';
 
 if (!empty($financials)) {
-    $financial_labels = [];
-    $financial_sales_data = [];
-    $financial_received_data = [];
-    $financial_expenses_data = [];
+    $financial_labels = array();
+    $financial_sales_data = array();
+    $financial_received_data = array();
+    $financial_expenses_data = array();
     foreach ($financials as $row) {
         $financial_labels[] = $row['project'];
         $financial_sales_data[] = (float)$row['sales'];
@@ -1157,8 +1174,8 @@ if (!empty($aging_buckets_summary)) {
 $vendor_labels_json = '[]';
 $vendor_values_json = '[]';
 if (!empty($vendor_activity)) {
-    $vendor_labels = [];
-    $vendor_values = [];
+    $vendor_labels = array();
+    $vendor_values = array();
     $count = 0;
     foreach ($vendor_activity as $row) {
         $vendor_labels[] = $row['name'];
@@ -1177,7 +1194,7 @@ $cashflow_inflow_json = '[]';
 $cashflow_outflow_json = '[]';
 $cashflow_net_json = '[]';
 if (!empty($cashflow_data)) {
-    $daily = [];
+    $daily = array();
     foreach ($cashflow_data as $row) {
         $dateKey = $row['date'];
         if (!isset($daily[$dateKey])) {
@@ -1190,10 +1207,10 @@ if (!empty($cashflow_data)) {
         $daily[$dateKey]['out'] += (float)$row['outflow'];
     }
     ksort($daily);
-    $dates = [];
-    $inflowSeries = [];
-    $outflowSeries = [];
-    $netSeries = [];
+    $dates = array();
+    $inflowSeries = array();
+    $outflowSeries = array();
+    $netSeries = array();
     foreach ($daily as $dateKey => $vals) {
         $dates[] = date('d-M', strtotime($dateKey));
         $inflowSeries[] = $vals['in'];

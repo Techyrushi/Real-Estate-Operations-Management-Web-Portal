@@ -14,31 +14,46 @@ $error = "";
 
 if (isset($_GET['action'], $_GET['id']) && $_GET['action'] === 'delete') {
     $delete_id = (int)$_GET['id'];
-    if ($delete_id === (int)($_SESSION['user_id'] ?? 0)) {
+    if ($delete_id <= 0) {
+        $error = "Invalid user selection.";
+    } elseif ($delete_id === (int)($_SESSION['user_id'] ?? 0)) {
         $error = "You cannot delete your own account.";
     } else {
-        $stmt = $pdo->prepare("SELECT username, role_id FROM users WHERE id = :id");
-        $stmt->execute(['id' => $delete_id]);
-        $userRow = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$userRow) {
-            $error = "User not found.";
-        } else {
-            $isAdminRole = false;
-            if (!empty($userRow['role_id'])) {
-                $stmtRole = $pdo->prepare("SELECT name FROM roles WHERE id = :id");
-                $stmtRole->execute(['id' => $userRow['role_id']]);
-                $roleRow = $stmtRole->fetch(PDO::FETCH_ASSOC);
-                if ($roleRow && strtolower($roleRow['name']) === 'admin') {
-                    $isAdminRole = true;
+        try {
+            $stmt = $pdo->prepare("SELECT username, role_id FROM users WHERE id = :id");
+            $stmt->execute(['id' => $delete_id]);
+            $userRow = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$userRow) {
+                $error = "User not found.";
+            } else {
+                $isAdminRole = false;
+                if (!empty($userRow['role_id'])) {
+                    $stmtRole = $pdo->prepare("SELECT name FROM roles WHERE id = :id");
+                    $stmtRole->execute(['id' => $userRow['role_id']]);
+                    $roleRow = $stmtRole->fetch(PDO::FETCH_ASSOC);
+                    if ($roleRow && strtolower($roleRow['name']) === 'admin') {
+                        $isAdminRole = true;
+                    }
+                }
+                if ($isAdminRole) {
+                    $error = "Admin user cannot be deleted.";
+                } else {
+                    $pdo->beginTransaction();
+                    $clearAudit = $pdo->prepare("UPDATE audit_logs SET user_id = NULL WHERE user_id = :id");
+                    $clearAudit->execute(['id' => $delete_id]);
+
+                    $stmtDel = $pdo->prepare("DELETE FROM users WHERE id = :id");
+                    if ($stmtDel->execute(['id' => $delete_id])) {
+                        $pdo->commit();
+                        $msg = "User deleted successfully.";
+                    } else {
+                        $pdo->rollBack();
+                        $error = "Unable to delete user.";
+                    }
                 }
             }
-            if ($isAdminRole) {
-                $error = "Admin user cannot be deleted.";
-            } else {
-                $stmtDel = $pdo->prepare("DELETE FROM users WHERE id = :id");
-                $stmtDel->execute(['id' => $delete_id]);
-                $msg = "User deleted successfully.";
-            }
+        } catch (PDOException $e) {
+            $error = "Unable to delete user. It may be linked to other records.";
         }
     }
 }
@@ -80,10 +95,36 @@ $users = $stmt->fetchAll();
                 <div class="box">
                     <div class="box-body">
                         <?php if ($msg): ?>
-                            <div class="alert alert-success"><?php echo $msg; ?></div>
+                            <script>
+                                document.addEventListener('DOMContentLoaded', function() {
+                                    Swal.fire({
+                                        icon: 'success',
+                                        title: 'Success',
+                                        text: '<?php echo $msg; ?>',
+                                        confirmButtonText: 'OK'
+                                    }).then((result) => {
+                                        if (result.isConfirmed) {
+                                            window.location.href = 'admin_users.php';
+                                        }
+                                    });
+                                });
+                            </script>
                         <?php endif; ?>
                         <?php if ($error): ?>
-                            <div class="alert alert-danger"><?php echo $error; ?></div>
+                            <script>
+                                document.addEventListener('DOMContentLoaded', function() {
+                                    Swal.fire({
+                                        icon: 'error',
+                                        title: 'Error',
+                                        text: '<?php echo $error; ?>',
+                                        confirmButtonText: 'OK'
+                                    }).then((result) => {
+                                        if (result.isConfirmed) {
+                                            window.location.href = 'admin_users.php';
+                                        }
+                                    });
+                                });
+                            </script>
                         <?php endif; ?>
                         <div class="table-responsive">
                             <table class="table table-hover mb-0">
@@ -114,13 +155,13 @@ $users = $stmt->fetchAll();
                                         <td><span class="badge badge-primary"><?php echo htmlspecialchars($user['role_name']); ?></span></td>
                                         <td><?php echo date('d M Y', strtotime($user['created_at'])); ?></td>
                                         <td>
-                                            <a href="admin_user_edit.php?id=<?php echo $user['id']; ?>" class="text-info me-2" data-bs-toggle="tooltip" title="Edit"><i class="ti-pencil"></i></a>
+                                            <a href="admin_user_edit.php?id=<?php echo $user['id']; ?>" class="text-info me-2" data-bs-toggle="tooltip" title="Edit"><i class="ti-pencil" ></i></a>
                                             <?php
                                             $isSelf = ($user['id'] == ($_SESSION['user_id'] ?? 0));
                                             $isAdminRole = strtolower($user['role_name'] ?? '') === 'admin';
                                             if (!$isSelf && !$isAdminRole):
                                             ?>
-                                                <a href="admin_users.php?action=delete&id=<?php echo $user['id']; ?>" class="text-danger" data-bs-toggle="tooltip" title="Delete" onclick="return confirm('Delete this user?');"><i class="ti-trash"></i></a>
+                                                <button type="button" class="btn btn-link text-danger p-0" data-bs-toggle="tooltip" title="Delete" onclick="confirmDeleteUser(<?php echo (int)$user['id']; ?>)" style="text-decoration: none;"><i class="ti-trash"></i></button>
                                             <?php endif; ?>
                                         </td>
                                     </tr>
@@ -135,5 +176,32 @@ $users = $stmt->fetchAll();
     </section>
   </div>
 </div>
+
+<script>
+function confirmDeleteUser(id) {
+    if (!id) {
+        return;
+    }
+    Swal.fire({
+        title: 'Are you sure?',
+        text: 'This will permanently delete the user account.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#3085d6',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'Yes, delete it!'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            Swal.fire({
+                title: 'Processing...',
+                text: 'Deleting user...',
+                allowOutsideClick: false,
+                didOpen: () => { Swal.showLoading(); }
+            });
+            window.location.href = 'admin_users.php?action=delete&id=' + id;
+        }
+    });
+}
+</script>
 
 <?php include 'includes/footer.php'; ?>

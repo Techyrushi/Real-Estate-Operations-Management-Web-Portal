@@ -11,32 +11,71 @@ if (!hasRole('Admin') && !hasPermission('manage_customers')) {
 $msg = '';
 $error = '';
 
-// Handle delete action
+if (isset($_GET['action']) && $_GET['action'] === 'cancel_booking' && isset($_GET['booking_id'])) {
+    $booking_id = (int) $_GET['booking_id'];
+    if ($booking_id > 0) {
+        try {
+            $pdo->beginTransaction();
+            $stmt = $pdo->prepare("SELECT unit_id FROM bookings WHERE id = ?");
+            $stmt->execute([$booking_id]);
+            $booking = $stmt->fetch();
+            if ($booking) {
+                $stmt = $pdo->prepare("UPDATE bookings SET status = 'Cancelled' WHERE id = ?");
+                $stmt->execute([$booking_id]);
+                if (!empty($booking['unit_id'])) {
+                    $stmt = $pdo->prepare("UPDATE units SET status = 'Available' WHERE id = ?");
+                    $stmt->execute([$booking['unit_id']]);
+                }
+                $pdo->commit();
+                $msg = "Booking cancelled successfully.";
+            } else {
+                $pdo->rollBack();
+                $error = "Booking not found.";
+            }
+        } catch (PDOException $e) {
+            $pdo->rollBack();
+            $error = "Unable to cancel booking.";
+        }
+    }
+}
+
 if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])) {
     $delete_id = (int) $_GET['id'];
     if ($delete_id > 0) {
         try {
-            $stmt = $pdo->prepare("SELECT COUNT(*) FROM bookings WHERE customer_id = ?");
+            $stmt = $pdo->prepare("SELECT COUNT(*) FROM bookings WHERE customer_id = ? AND status != 'Cancelled'");
             $stmt->execute([$delete_id]);
             $bookingCount = (int) $stmt->fetchColumn();
             if ($bookingCount > 0) {
-                $error = "Cannot delete customer because bookings exist. Cancel or delete bookings first.";
+                $error = "Cannot delete customer because active bookings exist. Cancel bookings first.";
             } else {
+                $pdo->beginTransaction();
+
+                $stmt = $pdo->prepare("DELETE FROM payments WHERE booking_id IN (SELECT id FROM bookings WHERE customer_id = ?)");
+                $stmt->execute([$delete_id]);
+
+                $stmt = $pdo->prepare("DELETE FROM bookings WHERE customer_id = ?");
+                $stmt->execute([$delete_id]);
+
                 $stmt = $pdo->prepare("DELETE FROM customers WHERE id = ?");
                 if ($stmt->execute([$delete_id])) {
+                    $pdo->commit();
                     $msg = "Customer deleted successfully.";
                 } else {
+                    $pdo->rollBack();
                     $error = "Failed to delete customer.";
                 }
             }
         } catch (PDOException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             $error = "Unable to delete customer.";
         }
     }
 }
 
-// Fetch Customers with Booking Details
-$sql = "SELECT c.*, b.booking_date, b.total_price as total_deal_amount, b.status as booking_status, 
+$sql = "SELECT c.*, b.id as booking_id, b.booking_date, b.total_price as total_deal_amount, b.status as booking_status, 
                p.name as project_name, u.flat_no    
         FROM customers c 
         LEFT JOIN bookings b ON c.id = b.customer_id
@@ -162,16 +201,19 @@ if (isset($_GET['export']) && $_GET['export'] === 'excel') {
                                             <td><?php echo $c['total_deal_amount'] ? '₹ ' . number_format($c['total_deal_amount'], 2) : '-'; ?></td>
                                             <td>
                                                 <?php if ($c['booking_status']): ?>
-                                                <span class="badge badge-<?php 
-                                                    echo match($c['booking_status']) {
-                                                        'Confirmed' => 'success',
-                                                        'Pending' => 'warning',
-                                                        'Cancelled' => 'danger',
-                                                        default => 'secondary'
-                                                    };
-                                                ?>">
-                                                    <?php echo $c['booking_status']; ?>
-                                                </span>
+                                                    <?php
+                                                    $badgeClass = 'secondary';
+                                                    if ($c['booking_status'] === 'Confirmed') {
+                                                        $badgeClass = 'success';
+                                                    } elseif ($c['booking_status'] === 'Pending') {
+                                                        $badgeClass = 'warning';
+                                                    } elseif ($c['booking_status'] === 'Cancelled') {
+                                                        $badgeClass = 'danger';
+                                                    }
+                                                    ?>
+                                                    <span class="badge badge-<?php echo $badgeClass; ?>">
+                                                        <?php echo $c['booking_status']; ?>
+                                                    </span>
                                                 <?php else: ?>
                                                     <span class="badge badge-secondary">No Booking</span>
                                                 <?php endif; ?>
@@ -180,6 +222,9 @@ if (isset($_GET['export']) && $_GET['export'] === 'excel') {
                                                 <a href="admin_customer_form.php?id=<?php echo $c['id']; ?>" class="btn btn-sm btn-secondary me-1" data-bs-toggle="tooltip" title="View"><i class="ti-eye"></i></a>
                                                 <a href="admin_customer_form.php?id=<?php echo $c['id']; ?>" class="btn btn-sm btn-info me-1" data-bs-toggle="tooltip" title="Edit"><i class="ti-pencil"></i></a>
                                                 <a href="admin_customer_ledger.php?customer_id=<?php echo $c['id']; ?>" class="btn btn-sm btn-warning me-1" data-bs-toggle="tooltip" title="Ledger"><i class="ti-wallet"></i></a>
+                                                <?php if (!empty($c['booking_id']) && ($c['booking_status'] ?? null) !== 'Cancelled'): ?>
+                                                    <button type="button" class="btn btn-sm btn-warning me-1" data-bs-toggle="tooltip" title="Cancel Booking" onclick="confirmCancelBooking(<?php echo (int) $c['booking_id']; ?>)"><i class="ti-close"></i></button>
+                                                <?php endif; ?>
                                                 <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="tooltip" title="Delete" onclick="confirmDeleteCustomer(<?php echo (int) ($c['id'] ?? 0); ?>)"><i class="ti-trash"></i></button>
                                             </td>
                                         </tr>
@@ -210,6 +255,23 @@ function confirmDeleteCustomer(id) {
     }).then((result) => {
         if (result.isConfirmed) {
             window.location.href = 'admin_customers.php?action=delete&id=' + id;
+        }
+    });
+}
+
+function confirmCancelBooking(bookingId) {
+    if (!bookingId) return;
+    Swal.fire({
+        title: 'Cancel this booking?',
+        text: 'This will mark the booking as Cancelled and free the unit.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#3085d6',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'Yes, cancel it!'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            window.location.href = 'admin_customers.php?action=cancel_booking&booking_id=' + bookingId;
         }
     });
 }
